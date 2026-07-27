@@ -376,7 +376,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.6.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.7.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
@@ -688,7 +688,9 @@ function bindNodes(){ boardEl.querySelectorAll('.node').forEach(el=>el.onclick=(
 }); }
 function autoScroll(p){ const b=G.board,H=(b.numFloors+1)*FLOOR_H+24,n=b.nodes[p.node];
   scrollEl.scrollTo({top:Math.max(0,H-(nodeBottom(n)+NODE/2)-scrollEl.clientHeight*0.58),behavior:'smooth'}); }
-function updateHUD(){ const me=G.players[0];
+// 画面に映すプレイヤー：ふだんは自分。みんなでモードは「今の番の人」（順番はルーレットで決まるので固定できない）
+function viewPlayer(){ if(G.mode==='friends') return G.players[G.turn]||G.me||G.players[0]; return G.me||G.players[0]; }
+function updateHUD(){ const me=viewPlayer();
   $('#coins').textContent=me?me.coins:0; $('#diamonds').textContent=me?me.diamonds:0; $('#floor').textContent=me?G.board.nodes[me.node].floor:0;
   if(G.mode==='solo'&&me){ $('#stamwrap').style.display='block';
     const hp=me.hp;                                   // 100=満タン、100超はオーバーチャージ
@@ -1014,7 +1016,7 @@ function handGroups(p){ const g=[], map={};
   p.cards.forEach((k,i)=>{ if(map[k]==null){ map[k]=g.length; g.push({key:k,n:1,i}); } else g[map[k]].n++; });
   return g; }
 function renderHand(){
-  const wrap=$('#hand'), me=G.players[0]; if(!me){ wrap.innerHTML=''; return; }
+  const wrap=$('#hand'), me=viewPlayer(); if(!me){ wrap.innerHTML=''; return; }
   const canUse=G.running&&G.wait&&G.wait.type==='spin'&&!(me.turn&&me.turn.usedActive);   // 1番に1枚だけ
   let h=handGroups(me).map(g=>{ const c=CARDS[g.key], num=g.n>1?`<span class="cnum">×${g.n}</span>`:'';
     if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${g.i}">${cardName(g.key)}${num}<span class="perm">${T('permanent')}</span></div>`;
@@ -1053,6 +1055,30 @@ async function takeTurn(p){
   await resolveLanding(p);
   if(G.mode!=='solo'){ if(G.board.nodes[p.node].type==='goal'){ endGame('win',p); return; } }
   else if(p.hp<=0){ endGame('retire',p); return; }
+}
+// ============ 最初のじゅんばん決め（ルーレットで・ヒロ指定2026-07-28） ============
+// 全員が1回ずつ回して、大きい数の人から先攻。同じ数なら、その人たちだけで振り直す。
+async function decideOrder(){
+  if(G.players.length<2) return;
+  banner(T('orderTitle'),'var(--accent)');
+  const score=new Map();
+  for(const p of G.players){ msg(T('orderWho',{name:p.name})); const r=await doSpin(p,{label:T('orderLabel')}); score.set(p,[r.val]); await sleep(180); }
+  const cmp=(a,b)=>{ const A=score.get(a),B=score.get(b);
+    for(let i=0;i<Math.max(A.length,B.length);i++){ const d=(B[i]||0)-(A[i]||0); if(d) return d; } return 0; };
+  let guard=0;
+  while(guard++<12){
+    const groups={}; G.players.forEach(p=>{ const k=score.get(p).join('-'); (groups[k]=groups[k]||[]).push(p); });
+    const tied=Object.values(groups).filter(g=>g.length>1);
+    if(!tied.length) break;
+    for(const g of tied){ msg(T('orderTie'));
+      for(const p of g){ msg(T('orderWho',{name:p.name})); const r=await doSpin(p,{label:T('orderLabel')}); score.get(p).push(r.val); await sleep(140); } }
+  }
+  G.players.sort(cmp); G.turn=0; render();
+  await new Promise(res=>{ const ov=document.createElement('div'); ov.className='overlay';
+    ov.innerHTML=`<div class="sheet"><h2>${T('orderReady')}</h2>
+      ${G.players.map((p,i)=>`<div class="shopItem"><span class="ic" style="width:26px;height:26px;border-radius:8px;background:${p.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900">${i+1}</span><span class="nm">${p.name}</span><span class="cst">🎡 ${score.get(p)[0]}</span></div>`).join('')}
+      <button class="btn" id="ordok">${T('startBtn')}</button></div>`;
+    $('#app').appendChild(ov); ov.querySelector('#ordok').onclick=()=>{ ov.remove(); AU('sfx','button'); res(); }; });
 }
 async function gameLoop(){ G.running=true;
   while(G.running){ const p=currentPlayer(); if(!p.finished){ await takeTurn(p); if(!G.running) break; } advanceTurn(); await sleep(100); } }
@@ -1168,8 +1194,10 @@ function startGame(){
   else if(G.mode==='friends'){ numFloors=G.friends.height||45; }
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
+  G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});
-  msg(T(G.mode==='solo'?'msgStartSolo':'msgStartRace')); gameLoop();
+  msg(T(G.mode==='solo'?'msgStartSolo':'msgStartRace'));
+  (async()=>{ await decideOrder(); gameLoop(); })();   // 先にルーレットでじゅんばんを決める
 }
 // ============ せってい（保存・適用） ============
 const SET_DEF={fs:1,bgm:1,sfx:1,theme:'green',moveSpd:1,roulSpd:1};
