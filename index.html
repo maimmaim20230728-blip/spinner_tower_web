@@ -383,9 +383,10 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.8.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.8.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
-const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
+// PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
+const FLOOR_H=96, NODE=46, PAD_B=118, GROUND=104, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
@@ -647,8 +648,10 @@ function nodeX(node){ const W=boardW(),L=node.laneCount; if(L<=1) return W*0.5;
   const maxSpan=Math.min(2*wallHalf-NODE-8,W-NODE-14); const span=Math.max(0,Math.min(maxSpan,(L-1)*70));
   return W/2-span/2+span*(node.lane/(L-1)); }
 function nodeBottom(node){ return node.floor*FLOOR_H+PAD_B; }
+// 盤面の高さ（いちばん上の余白＋ふもとの地面の分を含む）
+function boardHeight(){ return (G.board.numFloors+1)*FLOOR_H+24+(PAD_B-18); }
 function render(){
-  const b=G.board, H=(b.numFloors+1)*FLOOR_H+24; boardEl.style.height=H+'px'; let html='';
+  const b=G.board, H=boardHeight(); boardEl.style.height=H+'px'; let html='';
   for(const id in b.nodes){ const n=b.nodes[id],x=nodeX(n),bt=nodeBottom(n);
     if(n.type==='goal'){ html+=`<div class="node type-goal" data-id="${id}" style="left:${x}px;bottom:${bt}px">${CHEST_SVG}<span class="goaltag">${T('goalTag')}</span></div>`; continue; }
     const pickable=G.wait&&G.wait.type==='branch'&&G.wait.candidates.includes(id);
@@ -666,12 +669,13 @@ function render(){
   drawTower(); drawLinks(); bindNodes(); updateHUD();
 }
 function drawTower(){
-  const b=G.board,W=boardW(),H=(b.numFloors+1)*FLOOR_H+24,st=G.style||STYLES[0],s=$('#tower'); if(!s)return;
+  const b=G.board,W=boardW(),H=boardHeight(),st=G.style||STYLES[0],s=$('#tower'); if(!s)return;
   s.setAttribute('width',W); s.setAttribute('height',H); s.style.width=W+'px'; s.style.height=H+'px';
   const nf=b.numFloors,cx=W/2,yc=f=>H-(f*FLOOR_H+PAD_B+NODE/2),Lp=[],Rp=[];
   for(let f=0;f<=nf;f++){ const hw=towerWidthAt(f/nf)*W/2,y=yc(f); Lp.push([cx-hw,y]); Rp.push([cx+hw,y]); }
   const baseHW=towerWidthAt(0)*W/2;
-  const pts=[[cx-baseHW,H]].concat(Lp).concat([Rp[nf]]).concat(Rp.slice().reverse()).concat([[cx+baseHW,H]]);
+  const gy=H-GROUND;                                  // 地面の上端（ここが塔のふもと）
+  const pts=[[cx-baseHW,gy+10]].concat(Lp).concat([Rp[nf]]).concat(Rp.slice().reverse()).concat([[cx+baseHW,gy+10]]);
   const d='M'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L')+' Z';
   const tlx=Lp[nf][0],trx=Rp[nf][0],ty=Lp[nf][1]; let top='';
   if(st.shape==='pyramid') top=`<polygon points="${tlx-2},${ty} ${trx+2},${ty} ${cx},${(ty-30).toFixed(1)}" fill="${st.cap}" stroke="${st.mortar}" stroke-width="3"/>`;
@@ -680,10 +684,32 @@ function drawTower(){
     <rect width="46" height="28" fill="${st.mortar}"/><rect x="1" y="1" width="44" height="12" rx="2" fill="${st.brick}"/>
     <rect x="-22" y="15" width="44" height="12" rx="2" fill="${st.brick}"/><rect x="24" y="15" width="44" height="12" rx="2" fill="${st.brick}"/></pattern>
     <linearGradient id="shd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(0,0,0,.2)"/><stop offset=".5" stop-color="rgba(0,0,0,0)"/><stop offset="1" stop-color="rgba(0,0,0,.16)"/></linearGradient></defs>
-    <path d="${d}" fill="url(#brk)" stroke="${st.mortar}" stroke-width="4"/><path d="${d}" fill="url(#shd)"/>${top}`;
+    ${groundSvg(W,H,gy,cx,baseHW,st)}
+    <path d="${d}" fill="url(#brk)" stroke="${st.mortar}" stroke-width="4"/><path d="${d}" fill="url(#shd)"/>${top}
+    ${basePlinth(cx,baseHW,gy,st)}`;
+}
+// 🔴ふもと：地面・草・登り口の石段。ここから始まるのが一目で分かるように
+function groundSvg(W,H,gy,cx,baseHW,st){
+  const soil='#8a6f4e', soilDark='#6f5940', grass='#7fb069', grass2='#93c17c';
+  return `
+  <rect x="0" y="${gy}" width="${W}" height="${H-gy}" fill="${soil}"/>
+  <rect x="0" y="${gy+26}" width="${W}" height="${H-gy-26}" fill="${soilDark}"/>
+  <path d="M0,${gy+6} Q${W*0.18},${gy-10} ${W*0.36},${gy+2} T${W*0.72},${gy} T${W},${gy+5} L${W},${gy+30} L0,${gy+30} Z" fill="${grass}"/>
+  <path d="M0,${gy+10} Q${W*0.22},${gy-2} ${W*0.45},${gy+8} T${W},${gy+9} L${W},${gy+20} L0,${gy+20} Z" fill="${grass2}" opacity=".7"/>
+  <g fill="${grass}" opacity=".9">
+    <path d="M${W*0.10},${gy+4} l3,-13 l3,13 z"/><path d="M${W*0.86},${gy+2} l3,-12 l3,12 z"/>
+    <path d="M${W*0.72},${gy+8} l3,-10 l3,10 z"/><path d="M${W*0.22},${gy+9} l3,-11 l3,11 z"/>
+  </g>
+  <g fill="${st.cap}" stroke="${st.mortar}" stroke-width="2">
+    <rect x="${cx-34}" y="${gy+16}" width="68" height="11" rx="3"/>
+    <rect x="${cx-27}" y="${gy+6}" width="54" height="11" rx="3"/>
+  </g>`;
+}
+function basePlinth(cx,baseHW,gy,st){
+  return `<rect x="${cx-baseHW-9}" y="${gy-4}" width="${(baseHW+9)*2}" height="15" rx="4" fill="${st.cap}" stroke="${st.mortar}" stroke-width="3"/>`;
 }
 function drawLinks(){
-  const b=G.board,H=(b.numFloors+1)*FLOOR_H+24,s=$('#links');
+  const b=G.board,H=boardHeight(),s=$('#links');
   s.setAttribute('width',boardW()); s.setAttribute('height',H); s.style.width=boardW()+'px'; s.style.height=H+'px';
   let L=''; for(const id in b.nodes){ const n=b.nodes[id],x1=nodeX(n),y1=H-(nodeBottom(n)+NODE/2);
     n.next.forEach(nid=>{ const m=b.nodes[nid]; L+=`<line x1="${x1}" y1="${y1}" x2="${nodeX(m)}" y2="${H-(nodeBottom(m)+NODE/2)}" stroke="#e8efe9" stroke-width="5" stroke-linecap="round" opacity=".85"/>`; }); }
@@ -694,7 +720,7 @@ function bindNodes(){ boardEl.querySelectorAll('.node').forEach(el=>el.onclick=(
   if(G.wait.candidates.includes(id)) resolveWait(id);
   else { msg(T('pickGreen')); AU('sfx','button'); }   // 押せないマスを押した時も知らせる（無反応にしない）
 }); }
-function autoScroll(p){ const b=G.board,H=(b.numFloors+1)*FLOOR_H+24,n=b.nodes[p.node];
+function autoScroll(p){ const b=G.board,H=boardHeight(),n=b.nodes[p.node];
   scrollEl.scrollTo({top:Math.max(0,H-(nodeBottom(n)+NODE/2)-scrollEl.clientHeight*0.58),behavior:'smooth'}); }
 // 画面に映すプレイヤー：ふだんは自分。みんなでモードは「今の番の人」（順番はルーレットで決まるので固定できない）
 function viewPlayer(){ if(G.mode==='friends') return G.players[G.turn]||G.me||G.players[0]; return G.me||G.players[0]; }
@@ -719,7 +745,7 @@ function onWaitChange(){ const w=G.wait; $('#spinBtn').disabled=!(w&&w.type==='s
     if(w.dest) scrollToShow(w.candidates); } renderHand(); }
 // 候補が画面の外に出ないよう、いちばん上の候補が見える位置までスクロール
 function scrollToShow(ids){
-  const b=G.board; if(!b) return; const H=(b.numFloors+1)*FLOOR_H+24;
+  const b=G.board; if(!b) return; const H=boardHeight();
   let top=0; ids.forEach(id=>{ const n=b.nodes[id]; if(n && n.floor>top) top=n.floor; });
   const y=H-(top*FLOOR_H+PAD_B+NODE/2);
   scrollEl.scrollTo({top:Math.max(0,y-scrollEl.clientHeight*0.30),behavior:'smooth'});
