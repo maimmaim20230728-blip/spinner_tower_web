@@ -113,8 +113,9 @@
   .cchip.guard{border-color:#888; color:#555; background:#f2f2f2;}
   .cchip .perm{font-size:8px; background:#888; color:#fff; border-radius:5px; padding:0 3px; margin-left:2px;}
 
+  /* 🔴 z-index: タイトル画面(24)より必ず手前に出す。でないとパネルが裏に隠れて「押しても反応しない」ように見える */
   .overlay{position:absolute; inset:0; background:rgba(15,28,23,.55); display:flex; align-items:center;
-    justify-content:center; z-index:20; padding:16px;}
+    justify-content:center; z-index:26; padding:16px;}
   .sheet{background:var(--card); border-radius:18px; padding:20px; width:100%; max-width:360px; text-align:center;}
   .sheet.shopsheet{max-height:82vh; overflow-y:auto; text-align:left;}
   .sheet h1{margin:0 0 4px; font-size:22px; color:var(--green-d);}
@@ -367,7 +368,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.1.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.1.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_MAX=12, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
@@ -965,11 +966,14 @@ function renderStageList(){
       <span class="sinfo">${T('st'+i)}<div class="sdesc">${T('floorsUnit',{n:s.floors})} ／ ${T('sd'+i)}</div></span>
       ${cl.has(i)?'<span class="schk">✔</span>':''}</button>`;
   }).join('');
+  const mark=i=>{ list.querySelectorAll('.stagebtn').forEach(x=>{ x.style.borderColor=''; x.style.background=''; });
+    const b=list.querySelector(`.stagebtn[data-i="${i}"]`);
+    if(b){ b.style.borderColor='var(--accent-d)'; b.style.background='var(--card)'; b.scrollIntoView({block:'nearest'}); } };
   list.querySelectorAll('.stagebtn:not(.locked)').forEach(b=>b.onclick=()=>{
-    G.stage=+b.dataset.i; AU('sfx','button');
-    list.querySelectorAll('.stagebtn').forEach(x=>x.style.borderColor=''); b.style.borderColor='var(--accent-d)';
+    G.stage=+b.dataset.i; AU('sfx','button'); mark(G.stage);
   });
   G.stage=Math.min(G.stage??un, un);
+  mark(G.stage);   // 既定の選択を必ず見せる（未選択に見えないように）
 }
 function makePlayers(){ const arr=[],marks=['あ','B','C','D','E','F','G','H'];
   if(G.mode==='solo'){ const p=newP(0,T('you'),false); p.hp=SOLO_HP0; p.hpMax=SOLO_HPMAX; arr.push(p); }
