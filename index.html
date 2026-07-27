@@ -383,10 +383,11 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.8.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.8.4';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
-const FLOOR_H=96, NODE=46, PAD_B=118, GROUND=104, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
+// 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
+const FLOOR_H=96, NODE=46, PAD_B=16, GROUND=116, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
@@ -649,7 +650,7 @@ function nodeX(node){ const W=boardW(),L=node.laneCount; if(L<=1) return W*0.5;
   return W/2-span/2+span*(node.lane/(L-1)); }
 function nodeBottom(node){ return node.floor*FLOOR_H+PAD_B; }
 // 盤面の高さ（いちばん上の余白＋ふもとの地面の分を含む）
-function boardHeight(){ return (G.board.numFloors+1)*FLOOR_H+24+(PAD_B-18); }
+function boardHeight(){ return (G.board.numFloors+1)*FLOOR_H+24; }
 function render(){
   const b=G.board, H=boardHeight(); boardEl.style.height=H+'px'; let html='';
   for(const id in b.nodes){ const n=b.nodes[id],x=nodeX(n),bt=nodeBottom(n);
@@ -688,22 +689,27 @@ function drawTower(){
     <path d="${d}" fill="url(#brk)" stroke="${st.mortar}" stroke-width="4"/><path d="${d}" fill="url(#shd)"/>${top}
     ${basePlinth(cx,baseHW,gy,st)}`;
 }
-// 🔴ふもと：地面・草・登り口の石段。ここから始まるのが一目で分かるように
+// 🔴ふもと：下から「草の地面（スタートはここ）→ 石段 → 塔の土台」。さあ上るぞ、という並びにする
 function groundSvg(W,H,gy,cx,baseHW,st){
   const soil='#8a6f4e', soilDark='#6f5940', grass='#7fb069', grass2='#93c17c';
+  const gr=H-20;                                   // 草の地面ライン（スタートのマスが立つ高さ）
+  const sTop=H-(PAD_B+NODE)-2;                      // スタートのマスの上端＝石段はここから始める
+  const rise=sTop-gy, n=4, sh=rise/n;               // 石段は4段で塔の土台まで登る
+  let steps='';
+  for(let i=0;i<n;i++){
+    const w=(baseHW+30-i*7)*2, y=sTop-sh*(i+1);
+    steps+=`<rect x="${(cx-w/2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(sh+1).toFixed(1)}" rx="3" fill="${st.cap}" stroke="${st.mortar}" stroke-width="2"/>`;
+  }
   return `
-  <rect x="0" y="${gy}" width="${W}" height="${H-gy}" fill="${soil}"/>
-  <rect x="0" y="${gy+26}" width="${W}" height="${H-gy-26}" fill="${soilDark}"/>
-  <path d="M0,${gy+6} Q${W*0.18},${gy-10} ${W*0.36},${gy+2} T${W*0.72},${gy} T${W},${gy+5} L${W},${gy+30} L0,${gy+30} Z" fill="${grass}"/>
-  <path d="M0,${gy+10} Q${W*0.22},${gy-2} ${W*0.45},${gy+8} T${W},${gy+9} L${W},${gy+20} L0,${gy+20} Z" fill="${grass2}" opacity=".7"/>
+  <rect x="0" y="${gr}" width="${W}" height="${H-gr}" fill="${soilDark}"/>
+  <path d="M0,${gr} Q${W*0.2},${gr-9} ${W*0.42},${gr-2} T${W*0.78},${gr-4} T${W},${gr-1} L${W},${gr+8} L0,${gr+8} Z" fill="${grass}"/>
+  <path d="M0,${gr+3} Q${W*0.26},${gr-4} ${W*0.55},${gr+2} T${W},${gr+1} L${W},${gr+7} L0,${gr+7} Z" fill="${grass2}" opacity=".75"/>
   <g fill="${grass}" opacity=".9">
-    <path d="M${W*0.10},${gy+4} l3,-13 l3,13 z"/><path d="M${W*0.86},${gy+2} l3,-12 l3,12 z"/>
-    <path d="M${W*0.72},${gy+8} l3,-10 l3,10 z"/><path d="M${W*0.22},${gy+9} l3,-11 l3,11 z"/>
+    <path d="M${W*0.08},${gr-1} l3,-12 l3,12 z"/><path d="M${W*0.88},${gr-2} l3,-11 l3,11 z"/>
+    <path d="M${W*0.20},${gr-2} l3,-9 l3,9 z"/><path d="M${W*0.78},${gr-1} l3,-10 l3,10 z"/>
   </g>
-  <g fill="${st.cap}" stroke="${st.mortar}" stroke-width="2">
-    <rect x="${cx-34}" y="${gy+16}" width="68" height="11" rx="3"/>
-    <rect x="${cx-27}" y="${gy+6}" width="54" height="11" rx="3"/>
-  </g>`;
+  <path d="M${cx-baseHW-36},${gr} L${cx-baseHW-10},${gy+8} L${cx+baseHW+10},${gy+8} L${cx+baseHW+36},${gr} Z" fill="${soil}"/>
+  ${steps}`;
 }
 function basePlinth(cx,baseHW,gy,st){
   return `<rect x="${cx-baseHW-9}" y="${gy-4}" width="${(baseHW+9)*2}" height="15" rx="4" fill="${st.cap}" stroke="${st.mortar}" stroke-width="3"/>`;
