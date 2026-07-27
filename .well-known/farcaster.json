@@ -1,0 +1,16 @@
+{
+  "miniapp": {
+    "version": "1",
+    "name": "スゴロクタワー / Spinner Tower",
+    "iconUrl": "https://spinner-tower-web.vercel.app/icons/icon-512.png",
+    "homeUrl": "https://spinner-tower-web.vercel.app/",
+    "imageUrl": "https://spinner-tower-web.vercel.app/icons/fc-card-3x2.png",
+    "buttonTitle": "🏔️ のぼる / Play",
+    "splashImageUrl": "https://spinner-tower-web.vercel.app/icons/icon-512.png",
+    "splashBackgroundColor": "#3fb96b",
+    "subtitle": "ルーレットで塔をのぼる縦型すごろく",
+    "description": "ルーレットを回して塔をのぼる縦型分岐すごろく。分かれ道を選び、カードを集めて、頂上の宝箱にぴったり止まった人が勝ち。完全無料・広告なし・登録不要・オフラインOK。",
+    "primaryCategory": "games",
+    "tags": ["game", "boardgame", "casual", "tower", "soyogi"]
+  }
+}

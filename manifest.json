@@ -1,0 +1,16 @@
+{
+  "name": "スゴロクタワー",
+  "short_name": "スゴロクタワー",
+  "description": "ルーレットで塔をのぼる縦型分岐すごろく。カードを集めて頂上の宝箱にぴったり止まろう。Spinner Tower - a vertical branching board game.",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e9f6ec",
+  "theme_color": "#3fb96b",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
