@@ -112,6 +112,8 @@
   .cchip.passive{filter:saturate(.7);}
   .cchip.guard{border-color:#888; color:#555; background:#f2f2f2;}
   .cchip .perm{font-size:8px; background:#888; color:#fff; border-radius:5px; padding:0 3px; margin-left:2px;}
+  .cchip .cnum{font-size:11px; font-weight:900; margin-left:3px; padding:0 4px; border-radius:6px;
+    background:rgba(0,0,0,.10); color:inherit;}
 
   /* 🔴 z-index: タイトル画面(24)より必ず手前に出す。でないとパネルが裏に隠れて「押しても反応しない」ように見える */
   .overlay{position:absolute; inset:0; background:rgba(15,28,23,.55); display:flex; align-items:center;
@@ -368,8 +370,9 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.2.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
-const FLOOR_H=96, NODE=46, PAD_B=18, HAND_MAX=12, SOLO_HP0=100, SOLO_HPMAX=200;
+const APP_VER='1.4.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+// 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
+const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
@@ -465,7 +468,11 @@ function randomCardKey(){
   let pool=KEYS_BY_R[rar]; if(G.mode!=='solo') pool=pool.filter(k=>!CARDS[k].solo);
   return pick(pool);
 }
-function addCard(p,k){ if(p.cards.length>=HAND_MAX) return; p.cards.push(k); if(CARDS[k].security) p.security+=CARDS[k].security; }
+// 🔴12種類まで／同じカードは9枚まで
+function cardCount(p,k){ let c=0; for(const x of p.cards) if(x===k) c++; return c; }
+function handKinds(p){ return new Set(p.cards).size; }
+function canAddCard(p,k){ const c=cardCount(p,k); if(c>=SAME_MAX) return false; if(c===0 && handKinds(p)>=HAND_KINDS) return false; return true; }
+function addCard(p,k){ if(!canAddCard(p,k)) return; p.cards.push(k); if(CARDS[k].security) p.security+=CARDS[k].security; }
 function removeCard(p,i){ const k=p.cards[i]; if(!k)return; if(CARDS[k].security) p.security=Math.max(0,p.security-CARDS[k].security); p.cards.splice(i,1); }
 function drawCard(p,n=1){ for(let i=0;i<n;i++) addCard(p,randomCardKey()); }
 // パッシブ集計
@@ -488,11 +495,18 @@ function rollType(){
   if(r<95) return 'warp';
   return 'shop';
 }
-function enemyHPFor(f,total){ const t=total?f/total:0.3; return clamp(Math.round(2+t*5+rand(-1,2)),2,8); }
+// 敵の強さ＝到達した「階」で決まる（ヒロ確定・2026-07-28）
+//   〜19階=3まで / 〜29階=4まで / 〜49階=5まで / 〜69階=6まで / 〜99階=7まで / 100階〜=8(ドラゴン)も出る
+//   🔴130階以降は「5以上」が70%の確率で出る
+function enemyHPFor(f){
+  const cap = f<=19?3 : f<=29?4 : f<=49?5 : f<=69?6 : f<=99?7 : 8;
+  if(f>=130) return Math.random()<0.70 ? rand(5,cap) : rand(2,4);
+  return rand(2,cap);
+}
 function makeNode(idc,f,lanes,l,type,total){
   if(lanes===1 && type==='battle') type='coin';   // 1本道に敵を置かない
   const n={id:'n'+idc,floor:f,lane:l,laneCount:lanes,type,next:[],enemyHP:0};
-  if(type==='battle') n.enemyHP=enemyHPFor(f,total);
+  if(type==='battle') n.enemyHP=enemyHPFor(f);
   return n;
 }
 function laneFrac(i,c){ return c<=1?0.5:i/(c-1); }
@@ -569,7 +583,7 @@ function genBoard(numFloors,opts={}){
   const start=makeNode(b._idc++,0,1,0,'start',numFloors);
   b.nodes[start.id]=start; b.floors.push([start.id]); b.lanes=[{id:start.id,forkFloor:0}];
   extendFloors(b, numFloors, numFloors, hasGoal);
-  ensureBattleEscape(b); if(hasGoal) ensureSafeRoute(b);
+  ensureBattleEscape(b); placeCardsBeforeDragons(b); if(hasGoal) ensureSafeRoute(b);
   return b;
 }
 // 敵ゼロの逃げ道を保証（分岐のキモ）
@@ -585,11 +599,22 @@ function ensureBattleEscape(b){
       const t=b.nodes[pick(n.next)]; t.type='coin'; t.enemyHP=0;
     }
   }
-  // 🔴避けて通れない敵（そこにしか進めない一本道の先）にドラゴン級は置かない＝勝てず往復し続けるのを防ぐ
+}
+// 🔴ドラゴン(HP8)の手前3〜5マスをカードマスにする（ヒロ案・2026-07-28）
+//   負けて戻された先で必ずカードを拾えるので、カード無しで往復し続けて詰むことがなくなる。
+//   ドラゴンは一本道にも立てる＝「100階から8が出る」を素直に成立させられる。
+function placeCardsBeforeDragons(b){
+  const rev={}; for(const id in b.nodes) rev[id]=[];
+  for(const id in b.nodes) b.nodes[id].next.forEach(x=>rev[x].push(id));
   for(const id in b.nodes){ const n=b.nodes[id];
-    if(n.type!=='battle' || !rev[id].length) continue;
-    const unavoidable = rev[id].every(pid=>b.nodes[pid].next.length===1);
-    if(unavoidable && n.enemyHP>6) n.enemyHP=6;
+    if(n.type!=='battle' || n.enemyHP<8) continue;
+    let front=[id], seen=new Set([id]);
+    for(let d=1; d<=5; d++){
+      const nx=[]; front.forEach(x=>rev[x].forEach(y=>{ if(!seen.has(y)){ seen.add(y); nx.push(y); } }));
+      front=nx; if(!front.length) break;
+      if(d>=3) front.forEach(y=>{ const m=b.nodes[y];
+        if(m.type!=='start' && m.type!=='goal' && m.type!=='battle'){ m.type='card'; m.enemyHP=0; } });
+    }
   }
 }
 function ensureSafeRoute(b){
@@ -794,7 +819,17 @@ async function enemyBattle(p,node){
     msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot})); node.type='cleared'; node.enemyHP=0; }
   else{ const back=node.enemyHP-val; retreat(p,back); if(G.mode==='solo') p.hp-=back; AU('sfx','lose');
     const hpPart=G.mode==='solo'?T('battleLoseHp',{n:back}):'';
-    msg(T(p.isAI?'battleLoseA':'battleLoseP',{name:p.name,back,hp:hpPart})); }
+    // 🔴保険：同じ敵に3回負けたら助けのカードが入る（手前のカードマス=ヒロ案が主。これは稀な長期戦の尾を切る）
+    //   手札が上限で埋まっている時は、プラス系でないカードと入れ替える（=カードが入らず詰むのを防ぐ）
+    p.lossAt=p.lossAt||{}; const cnt=(p.lossAt[node.id]=(p.lossAt[node.id]||0)+1);
+    let mercy='';
+    if(cnt%3===0){
+      const gift=pick(['plus1','plus2','c_plus','b_plus']);
+      if(!canAddCard(p,gift)){ const i=p.cards.findIndex(k=>!CARDS[k].plus&&!CARDS[k].roulette); if(i>=0) removeCard(p,i); }
+      if(canAddCard(p,gift)){ addCard(p,gift); mercy='　'+T('battleMercy'); }
+    }
+    msg(T(p.isAI?'battleLoseA':'battleLoseP',{name:p.name,back,hp:hpPart})+mercy);
+    if(mercy) renderHand(); }
   render(); autoScroll(p); await sleep(650);
 }
 async function pvpBattle(a,b){
@@ -849,8 +884,8 @@ function openShop(p,opt){ return new Promise(resolve=>{
       forSale.forEach((k,i)=>{ if(k==null)return; const cost=RARITY[CARDS[k].r].cost, ok=p.coins>=cost.c&&p.diamonds>=(cost.d||0);
         h+=`<div class="shopItem">${cardChip(k)}<span class="cst">${cost.d?'💎'+cost.d+' ':''}🪙${cost.c}</span><button class="buy" data-b="${i}" ${ok?'':'disabled'}>${T('buy')}</button></div>`; }); }
     if(opt.buyback){ h+=`<div class="lbl2">${T('shopSellLbl')}${mult>1?T('shopSell3x'):''}</div>`; if(!p.cards.length) h+=`<div class="tiny">${T('shopNoCards')}</div>`;
-      p.cards.forEach((k,i)=>{ const s=RARITY[CARDS[k].r].sell;
-        h+=`<div class="shopItem">${cardChip(k)}<span class="cst">+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}</span><button class="sell" data-s="${i}">${T('sell')}</button></div>`; }); }
+      handGroups(p).forEach(g=>{ const s=RARITY[CARDS[g.key].r].sell;
+        h+=`<div class="shopItem">${cardChip(g.key)}${g.n>1?`<span class="cnum">×${g.n}</span>`:''}<span class="cst">+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}</span><button class="sell" data-s="${g.i}">${T('sell')}</button></div>`; }); }
     if(opt.exchange){ h+=`<div class="lbl2">${T('exchangeLbl')}</div><div class="exrow"><button class="ex" data-x="d2c" ${p.diamonds<1?'disabled':''}>💎1 → 🪙5</button><button class="ex" data-x="c2d" ${p.coins<5?'disabled':''}>🪙5 → 💎1</button></div>`; }
     h+=`<button class="btn sub" id="sc">${T('shopLeave')}</button></div>`; ov.innerHTML=h;
     ov.querySelectorAll('.buy').forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.b,k=forSale[i]; if(k==null)return; const cost=RARITY[CARDS[k].r].cost;
@@ -896,16 +931,20 @@ async function warpTile(p,node){
 function maybeExtendSolo(p){
   const b=G.board,top=b.numFloors; if(b.nodes[p.node].floor<top-10) return; const add=16;
   extendFloors(b, top+add, top+add, false);      // 分岐/合流のルールは本編と同じ
-  b.numFloors=top+add; ensureBattleEscape(b); render(); autoScroll(p);
+  b.numFloors=top+add; ensureBattleEscape(b); placeCardsBeforeDragons(b); render(); autoScroll(p);
 }
 
 // ============ 手札UI ============
+// 同じカードは1つのチップにまとめて「×枚数」を出す（12種類×最大9枚）
+function handGroups(p){ const g=[], map={};
+  p.cards.forEach((k,i)=>{ if(map[k]==null){ map[k]=g.length; g.push({key:k,n:1,i}); } else g[map[k]].n++; });
+  return g; }
 function renderHand(){
   const wrap=$('#hand'), me=G.players[0]; if(!me){ wrap.innerHTML=''; return; }
   const canUse=G.running&&G.wait&&G.wait.type==='spin';
-  let h=me.cards.map((k,i)=>{ const c=CARDS[k];
-    if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${i}">${cardName(k)}<span class="perm">${T('permanent')}</span></div>`;
-    return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${i}">${cardName(k)}</div>`; }).join('');
+  let h=handGroups(me).map(g=>{ const c=CARDS[g.key], num=g.n>1?`<span class="cnum">×${g.n}</span>`:'';
+    if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${g.i}">${cardName(g.key)}${num}<span class="perm">${T('permanent')}</span></div>`;
+    return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${g.i}">${cardName(g.key)}${num}</div>`; }).join('');
   if(me.security>0) h+=`<div class="cchip guard">🛡️×${me.security}</div>`;
   wrap.innerHTML=h;
   wrap.querySelectorAll('.cchip[data-i]').forEach(el=>el.onclick=()=>cardInfo(me,+el.dataset.i)); // タップで説明→使える時は使うボタン
@@ -915,8 +954,9 @@ function cardInfo(p, i){
   const kindLabel = c.kind==='passive' ? T('cardKindPassive') : T('cardKindActive');
   const usableNow = G.running && G.wait && G.wait.type==='spin' && c.kind==='active';
   const ov=document.createElement('div'); ov.className='overlay';
+  const num=cardCount(p,k);
   ov.innerHTML=`<div class="sheet">
-    <div class="cchip r${c.r}" style="display:inline-flex;font-size:15px;margin-bottom:8px">${cardName(k)}</div>
+    <div class="cchip r${c.r}" style="display:inline-flex;font-size:15px;margin-bottom:8px">${cardName(k)}${num>1?`<span class="cnum">×${num}</span>`:''}</div>
     <p class="tiny" style="font-weight:800;color:var(--ink);margin:2px 0">${kindLabel}</p>
     <p>${cardDesc(k)}</p>
     ${usableNow?`<button class="btn" id="ci-use">${T('useThisCard')}</button>`:''}
