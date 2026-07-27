@@ -21,13 +21,33 @@ for (const s of scripts) {
 
 const MUST_STR = [
   'APP_VER', 'スゴロクタワー', 'Spinner Tower',
-  'タワースペシャリスト', 'タワーエリート', 'タワーマスター', 'タワーゴッド',
+  "title50", "title100", "title200", "title500",   // 称号はi18nキー参照
   'ensureSafeRoute', 'ensureBattleEscape', 'takeFrom', 'titleCelebration',
-  'gt_solo_best', 'gt_settings', 'audio.js', 'sprites.js', 'manifest.json',
-  '介護と支援の相談どころ',
+  'gt_solo_best', 'gt_settings', 'gt_lang', 'audio.js', 'sprites.js', 'i18n.js', 'manifest.json',
+  'applyLang', 'data-i18n', '介護と支援の相談どころ',
   'fc:miniapp', '@farcaster/miniapp-sdk',          // 🔴 web版はFarcaster対応が必須
 ];
 for (const s of MUST_STR) (html.includes(s) ? ok : bad)('必須文字列: ' + s);
+
+console.log('[1b] i18n 契約');
+try {
+  const src = fs.readFileSync(path.join(root, 'i18n.js'), 'utf8');
+  const sandbox = { window: {} };
+  vm.runInNewContext(src, sandbox);
+  const I = sandbox.window.I18N;
+  if (!I) bad('window.I18N が定義されない');
+  else {
+    (I.order.length === 12 ? ok : bad)('12言語 (' + I.order.length + ')');
+    const jaN = Object.keys(I.dict.ja).length;
+    for (const lg of I.order) {
+      const d = I.dict[lg];
+      (d && Object.keys(d).length === jaN ? ok : bad)(`i18n ${lg}: ${d ? Object.keys(d).length : 0}/${jaN}キー`);
+    }
+    (I.rtl.includes('ar') ? ok : bad)('ar は RTL 指定');
+    for (const t of ['タワースペシャリスト','タワーエリート','タワーマスター','タワーゴッド'])
+      (Object.values(I.dict.ja).includes(t) ? ok : bad)('称号(ja): ' + t);
+  }
+} catch (e) { bad('i18n.js 実行エラー: ' + e.message); }
 
 const BANNED = /子ども|子供|こども向け|知育|幼児/;
 if (BANNED.test(html)) bad('禁句が本文に含まれる'); else ok('禁句なし(子ども/知育系)');

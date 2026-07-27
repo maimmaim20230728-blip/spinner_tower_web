@@ -236,6 +236,18 @@
   .stagebtn.locked .snum{background:#9aa8a0;}
   .stagebtn:active:not(.locked){transform:scale(.98);}
 
+  /* ===== RTL(アラビア語): 文字は右流れ・盤面の座標系はLTRのまま固定 ===== */
+  html[dir="rtl"] #boardScroll, html[dir="rtl"] #board{direction:ltr;}
+  html[dir="rtl"] .sheet, html[dir="rtl"] .setrow{text-align:right;}
+  html[dir="rtl"] .stagebtn{text-align:right;}
+
+  /* ===== 言語リスト ===== */
+  .langbtn{display:flex; align-items:center; gap:10px; width:100%; margin:5px 0; padding:11px 14px;
+    border:2px solid var(--line); border-radius:12px; background:var(--paper); font-weight:800;
+    font-size:calc(15px*var(--fs)); color:var(--ink);}
+  .langbtn.on{border-color:var(--accent); background:#e9fbf0; color:var(--accent-d);}
+  [data-theme="dark"] .langbtn.on{background:#20342a;}
+
   /* ===== バトル敵表示 ===== */
   #enemyShow{position:absolute; inset:0; z-index:18; display:flex; align-items:center; justify-content:center;
     background:rgba(15,28,23,.45); pointer-events:none;}
@@ -256,12 +268,12 @@
     <span class="pill">🏢 <b id="floor">0</b></span>
     <button class="iconbtn" id="gearBtn2" style="width:36px;height:36px;font-size:16px" aria-label="せってい">⚙️</button>
   </div>
-  <div id="turnbar">タワーへようこそ</div>
-  <div id="stamwrap"><div class="lbl"><span>たいりょく（食料をとらないとリタイア）</span><b id="hpnum">100</b></div><div id="stambar"><div id="stamfill"></div><div id="stamover"></div></div></div>
+  <div id="turnbar" data-i18n="welcome">タワーへようこそ</div>
+  <div id="stamwrap"><div class="lbl"><span data-i18n="staminaLbl">たいりょく（食料をとらないとリタイア）</span><b id="hpnum">100</b></div><div id="stambar"><div id="stamfill"></div><div id="stamover"></div></div></div>
   <div id="boardScroll"><div id="board"><svg id="tower"></svg><svg id="links"></svg></div></div>
   <div id="ctrl">
     <div id="msg"></div>
-    <div id="roulettewrap"><div id="roulette">?</div><button id="spinBtn" disabled>ルーレット</button></div>
+    <div id="roulettewrap"><div id="roulette">?</div><button id="spinBtn" disabled data-i18n="spinBtn">ルーレット</button></div>
     <div id="hand"></div>
   </div>
 
@@ -275,14 +287,14 @@
       <div id="titleLogo">スゴロクタワー</div>
       <div id="titleEn">Spinner Tower</div>
       <div class="modes">
-        <button class="modebtn" data-mode="campaign"><span class="mico">⚔️</span>対戦（AI）</button>
-        <button class="modebtn alt" data-mode="friends"><span class="mico">👥</span>みんなで</button>
-        <button class="modebtn solo" data-mode="solo"><span class="mico">🏔️</span>ソロ無限のぼり</button>
+        <button class="modebtn" data-mode="campaign"><span class="mico">⚔️</span><span data-i18n="modeCampaign">対戦（AI）</span></button>
+        <button class="modebtn alt" data-mode="friends"><span class="mico">👥</span><span data-i18n="modeFriends">みんなで</span></button>
+        <button class="modebtn solo" data-mode="solo"><span class="mico">🏔️</span><span data-i18n="modeSolo">ソロ無限のぼり</span></button>
       </div>
       <div id="soloBest"></div>
     </div>
     <div class="tfoot">
-      <a class="credit" href="https://soyogi.hp.peraichi.com/top" target="_blank" rel="noopener">アプリ開発：<u>介護と支援の相談どころ　そよぎ</u></a>
+      <a class="credit" href="https://soyogi.hp.peraichi.com/top" target="_blank" rel="noopener"><span data-i18n="creditPre">アプリ開発：</span><u data-i18n="creditOrg">介護と支援の相談どころ　そよぎ</u></a>
     </div>
   </div>
 
@@ -291,51 +303,61 @@
     <div class="sheet">
       <h2 id="mcTitle">対戦（AI）</h2>
       <div id="optCampaign">
-        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)">塔をえらぶ（クリアで次がひらく）</div>
+        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)" data-i18n="stageChoose">塔をえらぶ（クリアで次がひらく）</div>
         <div id="stageList" style="max-height:46vh;overflow-y:auto;margin:8px 0;"></div>
       </div>
       <div id="optFriends" style="display:none">
-        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)">人数（スマホ交代）</div>
+        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)" data-i18n="playersLbl">人数（スマホ交代）</div>
         <div class="seg" id="pcountSeg"><button data-pc="2" class="on">2</button><button data-pc="3">3</button><button data-pc="4">4</button></div>
         <div id="friendRows"></div>
-        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink);margin-top:8px">AIをまぜる（ふつう）</div>
+        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink);margin-top:8px" data-i18n="aiNormalLbl">AIをまぜる（ふつう）</div>
         <div class="seg" id="aiNSeg"><button data-v="0" class="on">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div>
-        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)">AIをまぜる（かしこい）</div>
+        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)" data-i18n="aiSmartLbl">AIをまぜる（かしこい）</div>
         <div class="seg" id="aiHSeg"><button data-v="0" class="on">0</button><button data-v="1">1</button><button data-v="2">2</button><button data-v="3">3</button></div>
-        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)">塔の高さ（種類はランダム）</div>
+        <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)" data-i18n="heightLbl">塔の高さ（種類はランダム）</div>
         <div class="seg" id="fHeightSeg"><button data-v="30">30</button><button data-v="45" class="on">45</button><button data-v="60">60</button><button data-v="80">80</button><button data-v="100">100</button></div>
         <input type="file" id="photoIn" accept="image/*" capture="user" style="display:none">
       </div>
-      <div id="optSolo" style="display:none"><p>食料をとりながら、どこまでも高くのぼろう。とちゅうでHPが0になったらリタイア。</p></div>
-      <button class="btn" id="startBtn">はじめる</button>
-      <button class="btn sub" id="mcBack">タイトルへもどる</button>
+      <div id="optSolo" style="display:none"><p data-i18n="soloDesc">食料をとりながら、どこまでも高くのぼろう。とちゅうでHPが0になったらリタイア。</p></div>
+      <button class="btn" id="startBtn" data-i18n="startBtn">はじめる</button>
+      <button class="btn sub" id="mcBack" data-i18n="backTitle">タイトルへもどる</button>
     </div>
   </div>
 
   <!-- せってい -->
   <div class="overlay" id="setPanel" style="display:none">
     <div class="sheet shopsheet">
-      <h2>⚙️ せってい</h2>
-      <div class="setrow"><div class="sl">文字の大きさ</div>
-        <div class="seg" data-set="fs"><button data-v="1" class="on">標準</button><button data-v="2">大きい</button><button data-v="3">特大</button></div></div>
-      <div class="setrow"><div class="sl">BGMの音量</div>
-        <div class="seg" data-set="bgm"><button data-v="0">0</button><button data-v="1" class="on">1倍</button><button data-v="2">2倍</button><button data-v="3">3倍</button></div></div>
-      <div class="setrow"><div class="sl">効果音の音量</div>
-        <div class="seg" data-set="sfx"><button data-v="0">0</button><button data-v="1" class="on">1倍</button><button data-v="2">2倍</button><button data-v="3">3倍</button></div></div>
-      <div class="setrow"><div class="sl">UIの色</div>
-        <div class="seg" data-set="theme"><button data-v="green" class="on">緑</button><button data-v="aqua">水色</button><button data-v="orange">オレンジ</button><button data-v="dark">ダーク</button></div></div>
-      <div class="setrow"><div class="sl">マス移動の速さ</div>
-        <div class="seg" data-set="moveSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on">1倍</button><button data-v="1.5">1.5</button><button data-v="2">2倍</button></div></div>
-      <div class="setrow"><div class="sl">ルーレットの速さ</div>
-        <div class="seg" data-set="roulSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on">1倍</button><button data-v="1.5">1.5</button><button data-v="2">2倍</button></div></div>
-      <button class="btn sub" id="setClose">とじる</button>
+      <h2 data-i18n="setTitle">⚙️ せってい</h2>
+      <div class="setrow"><div class="sl" data-i18n="setFs">文字の大きさ</div>
+        <div class="seg" data-set="fs"><button data-v="1" class="on" data-i18n="fsStd">標準</button><button data-v="2" data-i18n="fsBig">大きい</button><button data-v="3" data-i18n="fsHuge">特大</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setBgm">BGMの音量</div>
+        <div class="seg" data-set="bgm"><button data-v="0">0</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="2" data-i18n="times2">2倍</button><button data-v="3" data-i18n="times3">3倍</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setSfx">効果音の音量</div>
+        <div class="seg" data-set="sfx"><button data-v="0">0</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="2" data-i18n="times2">2倍</button><button data-v="3" data-i18n="times3">3倍</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setTheme">UIの色</div>
+        <div class="seg" data-set="theme"><button data-v="green" class="on" data-i18n="themeGreen">緑</button><button data-v="aqua" data-i18n="themeAqua">水色</button><button data-v="orange" data-i18n="themeOrange">オレンジ</button><button data-v="dark" data-i18n="themeDark">ダーク</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setMoveSpd">マス移動の速さ</div>
+        <div class="seg" data-set="moveSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setRoulSpd">ルーレットの速さ</div>
+        <div class="seg" data-set="roulSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
+      <button class="btn sub" id="setClose" data-i18n="close">とじる</button>
       <div class="tiny" style="text-align:center;margin-top:10px">スゴロクタワー / Spinner Tower <span id="appVer"></span><br>
-        <a href="https://soyogi.hp.peraichi.com/top" target="_blank" rel="noopener" style="color:var(--sub)">介護と支援の相談どころ　そよぎ</a></div>
+        <a href="https://soyogi.hp.peraichi.com/top" target="_blank" rel="noopener" style="color:var(--sub)" data-i18n="creditOrg">介護と支援の相談どころ　そよぎ</a></div>
+    </div>
+  </div>
+
+  <!-- 言語 / Language -->
+  <div class="overlay" id="langPanel" style="display:none">
+    <div class="sheet shopsheet">
+      <h2 data-i18n="langTitle">🌐 Language</h2>
+      <div id="langList"></div>
+      <button class="btn sub" id="langClose" data-i18n="close">とじる</button>
     </div>
   </div>
 </div>
 <script src="sprites.js"></script>
 <script src="audio.js"></script>
+<script src="i18n.js"></script>
 
 <script>
 "use strict";
@@ -345,13 +367,30 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.0.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.1.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_MAX=12, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
-const ENEMIES={2:{n:'スライム',e:'🟢'},3:{n:'巨大虫',e:'🐛'},4:{n:'イライラバード',e:'🐤'},
-  5:{n:'牙キツネ',e:'🦊'},6:{n:'ジョーカーベア',e:'🐻'},7:{n:'ハイイーグル',e:'🦅'},8:{n:'ドラゴン',e:'🐉'}};
+// ============ 多言語(12言語・辞書はi18n.js) ============
+const I18N_SAFE = window.I18N || {order:['ja'],names:{ja:'日本語'},rtl:[],dict:{ja:{}}};
+let LANG=(()=>{ const saved=localStorage.getItem('gt_lang'); if(saved&&I18N_SAFE.dict[saved]) return saved;
+  const nav=((navigator.language||'en').slice(0,2)).toLowerCase(); return I18N_SAFE.dict[nav]?nav:'en'; })();
+if(!I18N_SAFE.dict[LANG]) LANG='ja';
+function T(k,p){ const d=I18N_SAFE.dict; let s=(d[LANG]&&d[LANG][k])!=null?d[LANG][k]:(d.ja&&d.ja[k])!=null?d.ja[k]:k;
+  if(p) for(const key in p) s=s.split('{'+key+'}').join(p[key]); return s; }
+function applyLang(){
+  document.documentElement.lang=LANG;
+  document.documentElement.dir=I18N_SAFE.rtl.includes(LANG)?'rtl':'ltr';
+  document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=T(el.dataset.i18n); });
+  localStorage.setItem('gt_lang',LANG);
+  if(G&&G.board) render();
+}
+const cardName=k=>T('cn_'+k), cardDesc=k=>T('cd_'+k);
+
+const ENEMIES={2:{k:'enemy2',e:'🟢'},3:{k:'enemy3',e:'🐛'},4:{k:'enemy4',e:'🐤'},
+  5:{k:'enemy5',e:'🦊'},6:{k:'enemy6',e:'🐻'},7:{k:'enemy7',e:'🦅'},8:{k:'enemy8',e:'🐉'}};
+const enemyName=hp=>ENEMIES[hp]?T(ENEMIES[hp].k):T('enemyUnknown');
 
 const STYLES=[
   {name:'石の塔',brick:'#9aa2a8',mortar:'#6f767c',cap:'#c4cace',shape:'tower'},
@@ -374,48 +413,49 @@ const RARITY={
   B:{cost:{d:0,c:10}, sell:{d:0,c:2}},
   C:{cost:{d:0,c:5},  sell:{d:0,c:1}},
 };
+// 🔴カード名・説明文は i18n（cn_キー / cd_キー）。cardName(k)/cardDesc(k)で取得
 const CARDS={
   // S
-  s_roulette:{name:'Sルーレット',r:'S',kind:'passive',roulette:[4,10],d:'ルーレットが4〜10になる。持っている間ずっと。'},
-  s_plus:{name:'Sプラス',r:'S',kind:'passive',plus:5,d:'出目に+5。持っている間ずっと。他のプラスと重なる。'},
-  s_warp:{name:'Sワープ',r:'S',kind:'active',warp:'up2',d:'2つ上のワープマスへ飛ぶ。'},
-  s_free:{name:'Sフリームーブ',r:'S',kind:'passive',freemove:true,d:'分岐を無視して、上にも真横にも進める。持っている間ずっと。'},
-  s_sec:{name:'Sセキュリティ',r:'S',kind:'passive',security:10,d:'コイン・ダイヤ・カードを相手に10回まで奪われない。'},
-  plus3:{name:'プラス3',r:'S',kind:'passive',plus:3,d:'出目に+3。持っている間ずっと。他のプラスと重なる。'},
-  food_set:{name:'食料セット',r:'S',kind:'active',food:100,solo:true,d:'HPを100回復（最大200）。ソロ用。'},
-  candy:{name:'キャンディセット',r:'S',kind:'passive',candyHalf:true,solo:true,d:'HPの減りが半分になる。持っている間ずっと。ソロ用。'},
+  s_roulette:{r:'S',kind:'passive',roulette:[4,10]},
+  s_plus:{r:'S',kind:'passive',plus:5},
+  s_warp:{r:'S',kind:'active',warp:'up2'},
+  s_free:{r:'S',kind:'passive',freemove:true},
+  s_sec:{r:'S',kind:'passive',security:10},
+  plus3:{r:'S',kind:'passive',plus:3},
+  food_set:{r:'S',kind:'active',food:100,solo:true},
+  candy:{r:'S',kind:'passive',candyHalf:true,solo:true},
   // A
-  a_roulette:{name:'Aルーレット',r:'A',kind:'passive',roulette:[3,9],d:'ルーレットが3〜9になる。持っている間ずっと。'},
-  a_plus:{name:'Aプラス',r:'A',kind:'passive',plus:4,d:'出目に+4。持っている間ずっと。他のプラスと重なる。'},
-  a_warp:{name:'Aワープ',r:'A',kind:'active',warp:'up1',d:'1つ上のワープマスへ飛ぶ。'},
-  a_free:{name:'Aフリームーブ',r:'A',kind:'active',freemove:true,d:'この番だけ、分岐を無視して上にも真横にも進める。'},
-  a_sec:{name:'Aセキュリティ',r:'A',kind:'passive',security:5,d:'コイン・ダイヤ・カードを相手に5回まで奪われない。'},
-  plus2:{name:'プラス2',r:'A',kind:'passive',plus:2,d:'出目に+2。持っている間ずっと。他のプラスと重なる。'},
-  shop_a:{name:'ショップ召喚',r:'A',kind:'active',shop:5,d:'その場でショップを開く（品ぞろえ5種）。'},
-  free:{name:'フリー',r:'A',kind:'active',free:true,d:'回した後、出目の内で止まりたいマスを自分で選べる。ぴったりゴール向き。'},
-  phantom:{name:'ファントムダッシュ',r:'A',kind:'active',phantom:true,d:'この番、敵をすり抜ける（強制ストップされない）。'},
-  food_l:{name:'食料・大',r:'A',kind:'active',food:50,solo:true,d:'HPを50回復。ソロ用。'},
+  a_roulette:{r:'A',kind:'passive',roulette:[3,9]},
+  a_plus:{r:'A',kind:'passive',plus:4},
+  a_warp:{r:'A',kind:'active',warp:'up1'},
+  a_free:{r:'A',kind:'active',freemove:true},
+  a_sec:{r:'A',kind:'passive',security:5},
+  plus2:{r:'A',kind:'passive',plus:2},
+  shop_a:{r:'A',kind:'active',shop:5},
+  free:{r:'A',kind:'active',free:true},
+  phantom:{r:'A',kind:'active',phantom:true},
+  food_l:{r:'A',kind:'active',food:50,solo:true},
   // B
-  b_roulette:{name:'Bルーレット',r:'B',kind:'passive',roulette:[2,8],d:'ルーレットが2〜8になる。持っている間ずっと。'},
-  b_plus:{name:'Bプラス',r:'B',kind:'passive',plus:3,d:'出目に+3。持っている間ずっと。他のプラスと重なる。'},
-  b_warp:{name:'Bワープ',r:'B',kind:'active',warp:'spot',d:'その場でワープ。上か下かはランダム。'},
-  b_sec:{name:'Bセキュリティ',r:'B',kind:'passive',security:2,d:'コイン・ダイヤ・カードを相手に2回まで奪われない。'},
-  plus1:{name:'プラス1',r:'B',kind:'passive',plus:1,d:'出目に+1。持っている間ずっと。他のプラスと重なる。'},
-  shop_b:{name:'ミニショップ召喚',r:'B',kind:'active',shop:2,d:'その場でミニショップを開く（品ぞろえ2種）。'},
-  stop7:{name:'7ストップ',r:'B',kind:'active',stop:7,d:'ルーレットを必ず7で止める。パッシブは全て無効。'},
-  stop6:{name:'6ストップ',r:'B',kind:'active',stop:6,d:'ルーレットを必ず6で止める。パッシブは全て無効。'},
-  stop5:{name:'5ストップ',r:'B',kind:'active',stop:5,d:'ルーレットを必ず5で止める。パッシブは全て無効。'},
-  stop4:{name:'4ストップ',r:'B',kind:'active',stop:4,d:'ルーレットを必ず4で止める。パッシブは全て無効。'},
-  food_m:{name:'食料・中',r:'B',kind:'active',food:25,solo:true,d:'HPを25回復。ソロ用。'},
+  b_roulette:{r:'B',kind:'passive',roulette:[2,8]},
+  b_plus:{r:'B',kind:'passive',plus:3},
+  b_warp:{r:'B',kind:'active',warp:'spot'},
+  b_sec:{r:'B',kind:'passive',security:2},
+  plus1:{r:'B',kind:'passive',plus:1},
+  shop_b:{r:'B',kind:'active',shop:2},
+  stop7:{r:'B',kind:'active',stop:7},
+  stop6:{r:'B',kind:'active',stop:6},
+  stop5:{r:'B',kind:'active',stop:5},
+  stop4:{r:'B',kind:'active',stop:4},
+  food_m:{r:'B',kind:'active',food:25,solo:true},
   // C
-  c_plus:{name:'Cプラス',r:'C',kind:'passive',plus:2,d:'出目に+2。持っている間ずっと。他のプラスと重なる。'},
-  c_free:{name:'Cフリームーブ',r:'C',kind:'active',freemove:true,rouletteLimit:[1,3],d:'この番、真横にも進める。ただし出目は1〜3になる。'},
-  c_warp:{name:'Cワープ',r:'C',kind:'active',warp:'spotdown',d:'近くの下のワープマスへ飛ぶ。'},
-  c_sec:{name:'Cセキュリティ',r:'C',kind:'passive',security:2,d:'コイン・ダイヤを相手に2回まで奪われない。'},
-  stop3:{name:'3ストップ',r:'C',kind:'active',stop:3,d:'ルーレットを必ず3で止める。パッシブは全て無効。'},
-  stop2:{name:'2ストップ',r:'C',kind:'active',stop:2,d:'ルーレットを必ず2で止める。パッシブは全て無効。'},
-  stop1:{name:'1ストップ',r:'C',kind:'active',stop:1,d:'ルーレットを必ず1で止める。パッシブは全て無効。'},
-  food_s:{name:'食料・小',r:'C',kind:'active',food:10,solo:true,d:'HPを10回復。ソロ用。'},
+  c_plus:{r:'C',kind:'passive',plus:2},
+  c_free:{r:'C',kind:'active',freemove:true,rouletteLimit:[1,3]},
+  c_warp:{r:'C',kind:'active',warp:'spotdown'},
+  c_sec:{r:'C',kind:'passive',security:2},
+  stop3:{r:'C',kind:'active',stop:3},
+  stop2:{r:'C',kind:'active',stop:2},
+  stop1:{r:'C',kind:'active',stop:1},
+  food_s:{r:'C',kind:'active',food:10,solo:true},
 };
 const KEYS_BY_R={S:[],A:[],B:[],C:[]};
 for(const k in CARDS) KEYS_BY_R[CARDS[k].r].push(k);
@@ -511,7 +551,7 @@ function nodeBottom(node){ return node.floor*FLOOR_H+PAD_B; }
 function render(){
   const b=G.board, H=(b.numFloors+1)*FLOOR_H+24; boardEl.style.height=H+'px'; let html='';
   for(const id in b.nodes){ const n=b.nodes[id],x=nodeX(n),bt=nodeBottom(n);
-    if(n.type==='goal'){ html+=`<div class="node type-goal" data-id="${id}" style="left:${x}px;bottom:${bt}px">${CHEST_SVG}<span class="goaltag">ゴール</span></div>`; continue; }
+    if(n.type==='goal'){ html+=`<div class="node type-goal" data-id="${id}" style="left:${x}px;bottom:${bt}px">${CHEST_SVG}<span class="goaltag">${T('goalTag')}</span></div>`; continue; }
     const pickable=G.wait&&G.wait.type==='branch'&&G.wait.candidates.includes(id);
     let inner = n.type==='card' ? `<span class="cardlbl">Card</span>` :
       `<span>${n.type==='battle'&&ENEMIES[n.enemyHP]?ENEMIES[n.enemyHP].e:(TILE_ICON[n.type]||'·')}</span>`;
@@ -559,7 +599,7 @@ function updateHUD(){ const me=G.players[0];
     const fill=$('#stamfill'); fill.style.width=clamp(Math.min(hp,100),0,100)+'%';
     fill.style.background = hp<=20 ? '#e05353' : hp<=50 ? '#f0a533' : 'linear-gradient(90deg,var(--green),#5fd08a)';
     const over=$('#stamover'); const ov=clamp(hp-100,0,100); over.style.width=ov+'%'; over.style.opacity=ov>0?1:0;
-    const num=$('#hpnum'); num.textContent = hp>100 ? `${hp}（満タン+${hp-100}）` : `${hp}`;
+    const num=$('#hpnum'); num.textContent = hp>100 ? T('hpFull',{hp,n:hp-100}) : `${hp}`;
     num.style.color = hp<=20?'#e05353' : hp<=50?'#c67f16' : (hp>100?'#0a8a9c':'var(--green-d)');
   } }
 function msg(t){ $('#msg').textContent=t; }
@@ -569,13 +609,13 @@ function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.b
 function waitFor(type,extra={}){ return new Promise(res=>{ G.wait={type,resolve:res,...extra}; onWaitChange(); }); }
 function resolveWait(v){ const w=G.wait; G.wait=null; onWaitChange(); if(w) w.resolve(v); }
 function onWaitChange(){ const w=G.wait; $('#spinBtn').disabled=!(w&&w.type==='spin');
-  if(w&&w.type==='branch'){ msg('分かれ道。のぼるマスをタップ'); render(); } renderHand(); }
+  if(w&&w.type==='branch'){ msg(T('branchMsg')); render(); } renderHand(); }
 $('#spinBtn').onclick=()=>{ if(G.wait&&G.wait.type==='spin') resolveWait(true); };
 
 // ============ ルーレット ============
 async function doSpin(p,{label=''}={}){
   const ctx=p.turn||{};
-  if(!p.isAI){ msg('使うカードがあれば今。回すとルーレット'); await waitFor('spin',{label}); }
+  if(!p.isAI){ msg(T('spinHint')); await waitFor('spin',{label}); }
   else await sleep(400);
   const roul=$('#roulette'); let base,val;
   if(ctx.stop!=null){ base=ctx.stop; val=ctx.stop; }   // ストップは正確にN（プラス無視）
@@ -584,7 +624,7 @@ async function doSpin(p,{label=''}={}){
     for(let i=0;i<9;i++){ roul.textContent=rand(lo,hi); await sleep(rlDelay(45+i*8)); }
     base=rand(lo,hi); val=base+plusOf(p); }
   roul.textContent=val; AU('sfx','tick');
-  if(label) msg(`${p.name}：${label} ${val}${val!==base?`(出目${base})`:''}`);
+  if(label) msg(T('msgSpin',{name:p.name,label,val}) + (val!==base?T('dieShown',{n:base}):''));
   await sleep(rlDelay(230)); return {base,val};
 }
 
@@ -614,7 +654,7 @@ function aiEndgamePrep(p){
   const fi=p.cards.findIndex(k=>CARDS[k].free); if(fi>=0){ p.turn.free=true; removeCard(p,fi); } }
 function chooseDistance(p,max){ return new Promise(res=>{ const ov=document.createElement('div'); ov.className='overlay';
   let b=''; for(let i=1;i<=max;i++) b+=`<button class="dbtn" data-d="${i}">${i}</button>`;
-  ov.innerHTML=`<div class="sheet"><h2>フリー：何マス進む？</h2><div class="dgrid">${b}</div><p class="tiny">ゴールにぴったり止まりたい時に</p></div>`;
+  ov.innerHTML=`<div class="sheet"><h2>${T('freeChoose')}</h2><div class="dgrid">${b}</div><p class="tiny">${T('freeHint')}</p></div>`;
   ov.querySelectorAll('.dbtn').forEach(x=>x.onclick=()=>{ ov.remove(); res(+x.dataset.d); }); $('#app').appendChild(ov); }); }
 function aiFreeDist(p,raw){ const D=G.board.numFloors-G.board.nodes[p.node].floor; return (D>=1&&D<=raw)?D:raw; }
 
@@ -634,7 +674,7 @@ async function movePlayer(p,rawSteps,ctx){
       if(last || ctx.free){ p.node=goalId; p.path.push(goalId); render(); autoScroll(p); await sleep(mvDelay(175)); break; }
       // オーバー＝ぴったりでない＝通り過ぎてはね返る（救済なし。ストップ札で調整するのが正解）
       const rem=steps-1-s; p.node=goalId; p.path.push(goalId); render(); await sleep(mvDelay(150));
-      retreat(p,rem); render(); autoScroll(p); msg('ゴールを通り過ぎた！ぴったりじゃないと入れず、はね返る'); await sleep(mvDelay(300)); break;
+      retreat(p,rem); render(); autoScroll(p); msg(T('overshoot')); await sleep(mvDelay(300)); break;
     }
     const target = nexts.length===1? nexts[0] : (p.isAI? aiChoose(p,nexts) : await waitFor('branch',{candidates:nexts}));
     p.node=target; p.path.push(target); AU('sfx','move');
@@ -658,71 +698,72 @@ async function resolveLanding(p){
   const others=G.players.filter(o=>o!==p&&!o.finished&&o.node===p.node);
   if(others.length){ for(const o of others) await pvpBattle(p,o); return; }
   switch(n.type){
-    case 'coin':{ const c=rand(2,5); p.coins+=c; AU('sfx','coin'); msg(`${p.name}：🪙+${c}`); break; }
-    case 'diamond':{ const d=Math.random()<0.3?2:1; p.diamonds+=d; AU('sfx','diamond'); msg(`${p.name}：💎+${d}`); break; }
-    case 'card':{ drawCard(p); AU('sfx','card'); msg(`${p.name}：カードを1枚ひろった`); break; }
+    case 'coin':{ const c=rand(2,5); p.coins+=c; AU('sfx','coin'); msg(T('coinGet',{name:p.name,n:c})); break; }
+    case 'diamond':{ const d=Math.random()<0.3?2:1; p.diamonds+=d; AU('sfx','diamond'); msg(T('diamondGet',{name:p.name,n:d})); break; }
+    case 'card':{ drawCard(p); AU('sfx','card'); msg(T('cardGet',{name:p.name})); break; }
     case 'shop':{ await openShop(p,{cards:5,buyback:true,exchange:true}); break; }
-    case 'battle':{ if(ctx.phantom){ const g=gainOne(p); msg(`ファントムダッシュで敵をすり抜けた！回避成功、${g}`); } else await enemyBattle(p,n); break; }
+    case 'battle':{ if(ctx.phantom){ const g=gainOne(p); msg(T('phantomPass',{got:g})); } else await enemyBattle(p,n); break; }
     case 'event':{ await doEvent(p); break; }
     case 'warp':{ await warpTile(p,n); break; }
   }
   render();
 }
-function gainOne(p){ const r=rand(0,2); if(r===0){p.coins+=rand(2,4);return '🪙';} if(r===1){p.diamonds+=1;return '💎';} drawCard(p); return 'カード1枚'; }
+function gainOne(p){ const r=rand(0,2); if(r===0){p.coins+=rand(2,4);return '🪙';} if(r===1){p.diamonds+=1;return '💎';} drawCard(p); return T('gainCard1'); }
 
 // ============ バトル ============
 function battleLoot(p,hp){ const strong=hp>=5,r=rand(0,2);
   if(r===0){ const d=strong?rand(1,2):1; p.diamonds+=d; return `💎+${d}`; }
   if(r===1){ const c=strong?rand(5,15):rand(2,5); p.coins+=c; return `🪙+${c}`; }
-  const n=strong?rand(1,3):rand(1,2); drawCard(p,n); return `カード+${n}`; }
+  const n=strong?rand(1,3):rand(1,2); drawCard(p,n); return T('lootCards',{n}); }
 // 敵の登場演出：32×32ドット絵(sprites.js)を大きく表示＋名前
 function showEnemy(hp){
   const sp=(window.ENEMY_SPRITES||{})[hp];
-  const en=ENEMIES[hp]||{n:'なぞの生きもの',e:'⚔️'};
+  const en=ENEMIES[hp]||{e:'⚔️'};
   const box=document.createElement('div'); box.id='enemyShow';
   box.innerHTML=`<div class="ebox">${sp?sp.svg:`<div style="font-size:72px">${en.e}</div>`}
-    <div class="ename">${en.n}</div><div class="ehp">つよさ ${hp}</div></div>`;
+    <div class="ename">${enemyName(hp)}</div><div class="ehp">${T('enemyPower',{n:hp})}</div></div>`;
   $('#app').appendChild(box);
   setTimeout(()=>box.remove(), 1050);
 }
 async function enemyBattle(p,node){
-  const en=ENEMIES[node.enemyHP]||{n:'なぞの生きもの',e:'⚔️'};
-  banner(`${en.e} ${en.n}が あらわれた！（HP${node.enemyHP}）`,'var(--battle)');
+  const en=ENEMIES[node.enemyHP]||{e:'⚔️'}; const ename=enemyName(node.enemyHP);
+  banner(T('enemyAppear',{emoji:en.e,ename,hp:node.enemyHP}),'var(--battle)');
   AU('sfx','battleStart'); showEnemy(node.enemyHP); await sleep(1000);
-  const {val}=await doSpin(p,{label:'たたかう'}); const who=p.isAI?`${p.name}は`:'';
+  const {val}=await doSpin(p,{label:T('fightLbl')});
   if(val>=node.enemyHP){ const loot=battleLoot(p,node.enemyHP); AU('sfx','win');
-    msg(`${who}戦闘に勝った！${en.n}は何か落として隠れてしまったぞ。${loot}を手に入れた！`); node.type='cleared'; node.enemyHP=0; }
+    msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot})); node.type='cleared'; node.enemyHP=0; }
   else{ const back=node.enemyHP-val; retreat(p,back); if(G.mode==='solo') p.hp-=back; AU('sfx','lose');
-    msg(`${who}これはかなわない！！後退しよう！（${back}マス${G.mode==='solo'?'・HP-'+back:''}）`); }
+    const hpPart=G.mode==='solo'?T('battleLoseHp',{n:back}):'';
+    msg(T(p.isAI?'battleLoseA':'battleLoseP',{name:p.name,back,hp:hpPart})); }
   render(); autoScroll(p); await sleep(650);
 }
 async function pvpBattle(a,b){
   banner(`⚔️ ${a.name} vs ${b.name}`,'var(--battle)'); AU('sfx','battleStart'); await sleep(300);
-  const ra=await doSpin(a,{label:'対戦'}); await sleep(120); const rb=await doSpin(b,{label:'対戦'});
-  if(ra.val===rb.val){ msg('引き分け。何も起きない'); await sleep(600); return; }
+  const ra=await doSpin(a,{label:T('duelLbl')}); await sleep(120); const rb=await doSpin(b,{label:T('duelLbl')});
+  if(ra.val===rb.val){ msg(T('pvpDraw')); await sleep(600); return; }
   const [win,lose,diff]= ra.val>rb.val?[a,b,ra.val-rb.val]:[b,a,rb.val-ra.val];
-  const got=takeFrom(win,lose); const lead=win.isAI?`${win.name}の勝ち！`:'戦闘に勝った！';
-  retreat(lose,diff); msg(`${lead}${lose.name}は${diff}マス後退。${got}`); render(); await sleep(700);
+  const got=takeFrom(win,lose); const lead=win.isAI?T('pvpWinA',{name:win.name}):T('pvpWinP');
+  retreat(lose,diff); msg(T('pvpAfter',{lead,name:lose.name,n:diff,got})); render(); await sleep(700);
 }
 // 敗者は逃げる時に落とし物を残し勝者が拾う（セキュリティで守れる）
 function takeFrom(win,lose){
   const opts=[]; if(lose.cards.length)opts.push('card'); if(lose.diamonds>0)opts.push('d'); if(lose.coins>0)opts.push('c');
-  if(!opts.length) return `${lose.name}は何も落とさなかった`;
-  if((lose.security||0)>0){ lose.security--; return `${lose.name}はセキュリティで守った`; }
+  if(!opts.length) return T('tfNothing',{name:lose.name});
+  if((lose.security||0)>0){ lose.security--; return T('tfGuard',{name:lose.name}); }
   const r=pick(opts);
-  if(r==='card'){ const k=lose.cards.pop(); addCard(win,k); if(CARDS[k].security)lose.security=Math.max(0,lose.security-CARDS[k].security); return 'カードを1枚ひろった'; }
-  if(r==='d'){ lose.diamonds--; win.diamonds++; return '💎をひろった'; }
-  lose.coins--; win.coins++; return '🪙をひろった';
+  if(r==='card'){ const k=lose.cards.pop(); addCard(win,k); if(CARDS[k].security)lose.security=Math.max(0,lose.security-CARDS[k].security); return T('tfCard'); }
+  if(r==='d'){ lose.diamonds--; win.diamonds++; return T('tfD'); }
+  lose.coins--; win.coins++; return T('tfC');
 }
 
 // ============ カードの使用（回す前） ============
 async function useCard(p,i){
   const k=p.cards[i], c=CARDS[k]; if(!c||c.kind!=='active') return;
-  if(c.stop!=null){ p.turn.stop=c.stop; removeCard(p,i); msg(`${c.name}：出目を${c.stop}に固定`); }
-  else if(c.free){ p.turn.free=true; removeCard(p,i); msg('フリー：回した後、止まるマスを選べる'); }
-  else if(c.freemove){ p.turn.freemove=true; if(c.rouletteLimit)p.turn.rouletteLimit=c.rouletteLimit; removeCard(p,i); msg('フリームーブ：分岐を無視して進める'); }
-  else if(c.phantom){ p.turn.phantom=true; removeCard(p,i); msg('ファントムダッシュ：敵をすり抜ける'); }
-  else if(c.food){ if(G.mode==='solo'){ p.hp=Math.min(p.hpMax,p.hp+c.food); msg(`食べた！HP+${c.food}`);} removeCard(p,i); }
+  if(c.stop!=null){ p.turn.stop=c.stop; removeCard(p,i); msg(T('useStop',{card:cardName(k),n:c.stop})); }
+  else if(c.free){ p.turn.free=true; removeCard(p,i); msg(T('useFree')); }
+  else if(c.freemove){ p.turn.freemove=true; if(c.rouletteLimit)p.turn.rouletteLimit=c.rouletteLimit; removeCard(p,i); msg(T('useFreemove')); }
+  else if(c.phantom){ p.turn.phantom=true; removeCard(p,i); msg(T('usePhantom')); }
+  else if(c.food){ if(G.mode==='solo'){ p.hp=Math.min(p.hpMax,p.hp+c.food); msg(T('useFood',{n:c.food}));} removeCard(p,i); }
   else if(c.warp){ removeCard(p,i); await useWarpCard(p,c.warp); }
   else if(c.shop){ removeCard(p,i); await openShop(p,{cards:c.shop,buyback:true,exchange:true}); }
   renderHand(); updateHUD();
@@ -733,25 +774,25 @@ async function useWarpCard(p,mode){
   else if(mode==='up1'){ const up=warps.filter(n=>n.floor>cur.floor).sort((a,c)=>a.floor-c.floor); dest=up[0]; }
   else if(mode==='spot'){ const near=warps.filter(n=>Math.abs(n.floor-cur.floor)<=10); dest=pick(near.length?near:warps); }
   else if(mode==='spotdown'){ const dn=warps.filter(n=>n.floor<cur.floor).sort((a,c)=>c.floor-a.floor); dest=dn[0]||pick(warps); }
-  if(!dest){ msg('ワープ先がない'); return; }
-  p.node=dest.id; p.path.push(dest.id); render(); autoScroll(p); msg(`ワープ！ ${dest.floor>cur.floor?'上へ':'下へ'}`); await sleep(500);
+  if(!dest){ msg(T('noWarpDest')); return; }
+  p.node=dest.id; p.path.push(dest.id); render(); autoScroll(p); msg(T('warpCardMsg',{dir:T(dest.floor>cur.floor?'dirUp':'dirDown')})); await sleep(500);
 }
 
 // ============ ショップ（ランダム5枚販売＋買取＋換金1💎=5🪙） ============
-function cardChip(k){ const c=CARDS[k]; return `<span class="cchip r${c.r}">${c.name}</span>`; }
+function cardChip(k){ const c=CARDS[k]; return `<span class="cchip r${c.r}">${cardName(k)}</span>`; }
 function openShop(p,opt){ return new Promise(resolve=>{
   const forSale=[]; for(let i=0;i<(opt.cards||0);i++) forSale.push(randomCardKey()); const mult=opt.sellMult||1;
   const ov=document.createElement('div'); ov.className='overlay';
-  const draw=()=>{ let h=`<div class="sheet shopsheet"><h2>🛒 ${opt.cards?'ショップ':(mult>1?'高価買取':'換金所')}</h2>
-    <p class="tiny">所持 🪙${p.coins} ／ 💎${p.diamonds}（1💎=5🪙）</p>`;
-    if(opt.cards){ h+=`<div class="lbl2">売り物（ランダム）</div>`;
+  const draw=()=>{ let h=`<div class="sheet shopsheet"><h2>🛒 ${opt.cards?T('shopTitle'):(mult>1?T('shopBuyback3'):T('shopExchangeT'))}</h2>
+    <p class="tiny">${T('shopOwn',{c:p.coins,d:p.diamonds})}</p>`;
+    if(opt.cards){ h+=`<div class="lbl2">${T('shopStock')}</div>`;
       forSale.forEach((k,i)=>{ if(k==null)return; const cost=RARITY[CARDS[k].r].cost, ok=p.coins>=cost.c&&p.diamonds>=(cost.d||0);
-        h+=`<div class="shopItem">${cardChip(k)}<span class="cst">${cost.d?'💎'+cost.d+' ':''}🪙${cost.c}</span><button class="buy" data-b="${i}" ${ok?'':'disabled'}>買う</button></div>`; }); }
-    if(opt.buyback){ h+=`<div class="lbl2">手札を売る${mult>1?'（3倍！）':''}</div>`; if(!p.cards.length) h+=`<div class="tiny">手札なし</div>`;
+        h+=`<div class="shopItem">${cardChip(k)}<span class="cst">${cost.d?'💎'+cost.d+' ':''}🪙${cost.c}</span><button class="buy" data-b="${i}" ${ok?'':'disabled'}>${T('buy')}</button></div>`; }); }
+    if(opt.buyback){ h+=`<div class="lbl2">${T('shopSellLbl')}${mult>1?T('shopSell3x'):''}</div>`; if(!p.cards.length) h+=`<div class="tiny">${T('shopNoCards')}</div>`;
       p.cards.forEach((k,i)=>{ const s=RARITY[CARDS[k].r].sell;
-        h+=`<div class="shopItem">${cardChip(k)}<span class="cst">+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}</span><button class="sell" data-s="${i}">売る</button></div>`; }); }
-    if(opt.exchange){ h+=`<div class="lbl2">換金</div><div class="exrow"><button class="ex" data-x="d2c" ${p.diamonds<1?'disabled':''}>💎1 → 🪙5</button><button class="ex" data-x="c2d" ${p.coins<5?'disabled':''}>🪙5 → 💎1</button></div>`; }
-    h+=`<button class="btn sub" id="sc">出発する</button></div>`; ov.innerHTML=h;
+        h+=`<div class="shopItem">${cardChip(k)}<span class="cst">+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}</span><button class="sell" data-s="${i}">${T('sell')}</button></div>`; }); }
+    if(opt.exchange){ h+=`<div class="lbl2">${T('exchangeLbl')}</div><div class="exrow"><button class="ex" data-x="d2c" ${p.diamonds<1?'disabled':''}>💎1 → 🪙5</button><button class="ex" data-x="c2d" ${p.coins<5?'disabled':''}>🪙5 → 💎1</button></div>`; }
+    h+=`<button class="btn sub" id="sc">${T('shopLeave')}</button></div>`; ov.innerHTML=h;
     ov.querySelectorAll('.buy').forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.b,k=forSale[i]; if(k==null)return; const cost=RARITY[CARDS[k].r].cost;
       if(p.coins<cost.c||p.diamonds<(cost.d||0))return; p.coins-=cost.c; p.diamonds-=(cost.d||0); addCard(p,k); forSale[i]=null; updateHUD(); draw(); });
     ov.querySelectorAll('.sell').forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.s,s=RARITY[CARDS[p.cards[i]].r].sell; p.coins+=s.c*mult; p.diamonds+=(s.d||0)*mult; removeCard(p,i); updateHUD(); draw(); });
@@ -762,19 +803,19 @@ function openShop(p,opt){ return new Promise(resolve=>{
 
 // ============ イベント ============
 async function doEvent(p){
-  banner('❓ イベント','var(--event)'); await sleep(280);
+  banner(T('evBanner'),'var(--event)'); await sleep(280);
   const solo=G.mode==='solo'; const evs=[];
   evs.push(()=>{ const opp=G.players.filter(o=>o!==p&&!o.finished); let cnt=0;
-    opp.forEach(o=>{ if(moveItemTo(p,o)) cnt++; }); return cnt? `強風だ！持ち物が飛んでいく…相手に${cnt}個移動` : '強風だ！でも飛ぶ物がなかった'; });
-  evs.push(()=>{ const n=rand(3,7); drawCard(p,n); return `カードの束発見！カード+${n}`; });
-  evs.push(async()=>{ await openShop(p,{buyback:true,sellMult:3}); return '高価買取（カードを3倍で売れる）'; });
-  evs.push(async()=>{ await openShop(p,{exchange:true}); return '換金所に立ち寄った'; });
-  evs.push(()=>{ retreat(p,7); drawCard(p,5); return '強敵だ！7マス戻る…がカードを5枚拾った'; });
-  evs.push(()=>{ retreat(p,5); drawCard(p,3); return '強敵だ！5マス戻る…がカードを3枚拾った'; });
-  evs.push(()=>{ retreat(p,2); drawCard(p,1); return '強敵だ！2マス戻る…がカードを1枚拾った'; });
-  evs.push(()=>{ const d=rand(1,3),c=rand(3,10); p.diamonds+=d; p.coins+=c; return `財宝発見！💎+${d}・🪙+${c}`; });
-  if(solo){ evs.push(()=>{ const h=rand(5,30); p.hp=Math.min(p.hpMax,p.hp+h); return `食べ物だ！HP+${h}`; });
-    evs.push(()=>{ const h=rand(5,30); p.hp-=h; return `食べ物だ！…しかしお腹を壊した。HP-${h}`; }); }
+    opp.forEach(o=>{ if(moveItemTo(p,o)) cnt++; }); return cnt? T('evWind',{n:cnt}) : T('evWindNone'); });
+  evs.push(()=>{ const n=rand(3,7); drawCard(p,n); return T('evCards',{n}); });
+  evs.push(async()=>{ await openShop(p,{buyback:true,sellMult:3}); return T('evBuyback'); });
+  evs.push(async()=>{ await openShop(p,{exchange:true}); return T('evExchange'); });
+  evs.push(()=>{ retreat(p,7); drawCard(p,5); return T('evStrong',{back:7,n:5}); });
+  evs.push(()=>{ retreat(p,5); drawCard(p,3); return T('evStrong',{back:5,n:3}); });
+  evs.push(()=>{ retreat(p,2); drawCard(p,1); return T('evStrong',{back:2,n:1}); });
+  evs.push(()=>{ const d=rand(1,3),c=rand(3,10); p.diamonds+=d; p.coins+=c; return T('evTreasure',{d,c}); });
+  if(solo){ evs.push(()=>{ const h=rand(5,30); p.hp=Math.min(p.hpMax,p.hp+h); return T('evFood',{n:h}); });
+    evs.push(()=>{ const h=rand(5,30); p.hp-=h; return T('evFoodBad',{n:h}); }); }
   const r=pick(evs); const out=await r(); msg(`${p.name}：${out}`); render(); await sleep(700);
 }
 function moveItemTo(from,to){
@@ -783,12 +824,12 @@ function moveItemTo(from,to){
   const r=pick(opts); if(r==='card'){ addCard(to,from.cards.pop()); } else if(r==='d'){ from.diamonds--; to.diamonds++; } else { from.coins--; to.coins++; } return true;
 }
 async function warpTile(p,node){
-  banner('🌀 ワープ！','var(--warp)'); AU('sfx','warp'); await sleep(320);
+  banner(T('warpBanner'),'var(--warp)'); AU('sfx','warp'); await sleep(320);
   const all=Object.values(G.board.nodes).filter(n=>n.type==='warp'&&n.id!==node.id);
   const near=all.filter(n=>Math.abs(n.floor-node.floor)<=10), pool=near.length?near:all;
-  if(!pool.length){ msg('ワープ先が見つからない'); await sleep(500); return; }
+  if(!pool.length){ msg(T('warpNotFound')); await sleep(500); return; }
   const dest=pick(pool),up=dest.floor>node.floor; p.node=dest.id; p.path.push(dest.id);
-  msg(`${p.name}：ワープ！ ${up?'上へ':'下へ'} ${Math.abs(dest.floor-node.floor)}階（運しだい）`); render(); autoScroll(p); await sleep(700);
+  msg(T('warpTileMsg',{name:p.name,dir:T(up?'dirUp':'dirDown'),n:Math.abs(dest.floor-node.floor)})); render(); autoScroll(p); await sleep(700);
 }
 
 // ============ ソロ無限：継ぎ足し ============
@@ -804,23 +845,23 @@ function renderHand(){
   const wrap=$('#hand'), me=G.players[0]; if(!me){ wrap.innerHTML=''; return; }
   const canUse=G.running&&G.wait&&G.wait.type==='spin';
   let h=me.cards.map((k,i)=>{ const c=CARDS[k];
-    if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${i}">${c.name}<span class="perm">常時</span></div>`;
-    return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${i}">${c.name}</div>`; }).join('');
+    if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${i}">${cardName(k)}<span class="perm">${T('permanent')}</span></div>`;
+    return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${i}">${cardName(k)}</div>`; }).join('');
   if(me.security>0) h+=`<div class="cchip guard">🛡️×${me.security}</div>`;
   wrap.innerHTML=h;
   wrap.querySelectorAll('.cchip[data-i]').forEach(el=>el.onclick=()=>cardInfo(me,+el.dataset.i)); // タップで説明→使える時は使うボタン
 }
 function cardInfo(p, i){
   const k=p.cards[i], c=CARDS[k]; if(!c) return;
-  const kindLabel = c.kind==='passive' ? '常時（持っているだけで効く）' : '使うと発動（ルーレットを回す前に）';
+  const kindLabel = c.kind==='passive' ? T('cardKindPassive') : T('cardKindActive');
   const usableNow = G.running && G.wait && G.wait.type==='spin' && c.kind==='active';
   const ov=document.createElement('div'); ov.className='overlay';
   ov.innerHTML=`<div class="sheet">
-    <div class="cchip r${c.r}" style="display:inline-flex;font-size:15px;margin-bottom:8px">${c.name}</div>
+    <div class="cchip r${c.r}" style="display:inline-flex;font-size:15px;margin-bottom:8px">${cardName(k)}</div>
     <p class="tiny" style="font-weight:800;color:var(--ink);margin:2px 0">${kindLabel}</p>
-    <p>${c.d||''}</p>
-    ${usableNow?`<button class="btn" id="ci-use">このカードを使う</button>`:''}
-    <button class="btn sub" id="ci-close">${usableNow?'やめる':'とじる'}</button></div>`;
+    <p>${cardDesc(k)}</p>
+    ${usableNow?`<button class="btn" id="ci-use">${T('useThisCard')}</button>`:''}
+    <button class="btn sub" id="ci-close">${usableNow?T('cancel'):T('close')}</button></div>`;
   $('#app').appendChild(ov);
   if(usableNow) ov.querySelector('#ci-use').onclick=()=>{ ov.remove(); useCard(p,i); };
   ov.querySelector('#ci-close').onclick=()=>ov.remove();
@@ -830,9 +871,9 @@ function cardInfo(p, i){
 function currentPlayer(){ return G.players[G.turn]; }
 function advanceTurn(){ G.turn=(G.turn+1)%G.players.length; }
 async function takeTurn(p){
-  p.turn={}; banner(`${p.name} の番`,p.color); autoScroll(p); renderHand(); await sleep(300);
+  p.turn={}; banner(T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name}),p.color); autoScroll(p); renderHand(); await sleep(300);
   if(p.isAI) aiEndgamePrep(p);
-  const {val}=await doSpin(p,{label:'移動'});
+  const {val}=await doSpin(p,{label:T('moveLbl')});
   const r=await movePlayer(p,val,p.turn);
   if(r==='retire'){ endGame('retire',p); return; }
   await resolveLanding(p);
@@ -844,7 +885,7 @@ async function gameLoop(){ G.running=true;
 
 // ============ 終了・演出 ============
 // 称号（ヒロ確定・2026-07-28）：50/100/200/500階。到達のたびコングラチュレーション演出
-const TITLES=[[0,'ふもとの旅人'],[50,'タワースペシャリスト'],[100,'タワーエリート'],[200,'タワーマスター'],[500,'タワーゴッド']];
+const TITLES=[[0,'title0'],[50,'title50'],[100,'title100'],[200,'title200'],[500,'title500']];
 const TITLE_MILESTONES=[50,100,200,500];
 async function titleCelebration(floor){
   const name=titleFor(floor);
@@ -854,22 +895,22 @@ async function titleCelebration(floor){
   for(let i=0;i<80;i++) b+=`<span style="left:${rand(0,100)}%;animation-delay:${rand(0,1200)/1000}s;animation-duration:${(140+rand(0,120))/100}s;font-size:${rand(22,36)}px">${pick(em)}</span>`;
   c.innerHTML=`<div class="flash"></div>${b}
     <div class="clearword" style="top:30%;font-size:30px">CONGRATULATIONS!</div>
-    <div class="clearword" style="top:42%;font-size:26px">${floor}階とうたつ！</div>
-    <div class="clearword" style="top:52%;font-size:24px">称号「${name}」</div>`;
-  $('#app').appendChild(c); banner(`👑 ${name}！`,'var(--coin)');
+    <div class="clearword" style="top:42%;font-size:26px">${T('reachedFloor',{n:floor})}</div>
+    <div class="clearword" style="top:52%;font-size:24px">${T('titleName',{t:name})}</div>`;
+  $('#app').appendChild(c); banner(T('kingBanner',{t:name}),'var(--coin)');
   await sleep(2200); c.remove();
 }
-function titleFor(f){ let t=TITLES[0][1]; for(const[x,n]of TITLES){ if(f>=x)t=n; } return t; }
+function titleFor(f){ let t=TITLES[0][1]; for(const[x,n]of TITLES){ if(f>=x)t=n; } return T(t); }
 function celebrate(grand){ const c=document.createElement('div'); c.className='celebrate'; const em=['🎉','✨','🎊','⭐','💎','🪙','🏆']; let b='';
   const n=grand?110:44;
   for(let i=0;i<n;i++) b+=`<span style="left:${rand(0,100)}%;animation-delay:${rand(0,grand?1800:900)/1000}s;animation-duration:${(140+rand(0,120))/100}s;font-size:${grand?rand(22,40):26}px">${pick(em)}</span>`;
-  const word=grand?`<div class="clearword" style="top:30%;font-size:34px">CONGRATULATIONS!</div><div class="clearword" style="top:42%">全塔制覇！</div>`:`<div class="clearword">クリア！</div>`;
+  const word=grand?`<div class="clearword" style="top:30%;font-size:34px">CONGRATULATIONS!</div><div class="clearword" style="top:42%">${T('allTowers')}</div>`:`<div class="clearword">${T('clearWord')}</div>`;
   c.innerHTML=`<div class="flash"></div>${b}${word}`; $('#app').appendChild(c); setTimeout(()=>c.remove(), grand?4600:2800); }
 function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const floor=G.board.nodes[p.node].floor;
   let extra='';
   if(G.mode==='solo'){
     const tiles=Math.max(0,p.path.length-1);
-    extra=`<br>のぼった高さ：${floor}階 ／ 進んだマス：${tiles}`;
+    extra=`<br>${T('soloResult',{f:floor,t:tiles})}`;
     const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
     if(!best || floor>best.floor) localStorage.setItem('gt_solo_best', JSON.stringify({floor,tiles}));
   }
@@ -878,35 +919,36 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
   const grand = humanWin && G.mode==='campaign' && (G.stage||0)===STAGES.length-1;
   if(humanWin && G.mode==='campaign') markCleared(G.stage||0);
   const show=()=>{ const ov=document.createElement('div'); ov.className='overlay';
-    const head=kind==='win'?(grand?`👑 全ての塔を制覇！`:`🏆 ${p.name} 頂上の宝箱へ！`):'🍽️ 力つき、リタイア';
-    const unlockNote = humanWin && G.mode==='campaign' && !grand && (G.stage||0)+1<STAGES.length ? `<br>「${STAGES[(G.stage||0)+1].name}」がひらいた！` : '';
-    const body=(kind==='win'?(grand?`最高の塔をのぼりきった、真の塔の主だ！`:`ぴったり止まってクリア！`):``)+`${extra}${unlockNote}<br>称号「${titleFor(floor)}」`;
-    ov.innerHTML=`<div class="sheet"><h1 style="font-size:20px">${head}</h1><p>${body}</p><button class="btn" id="again">もう一回</button><button class="btn sub" id="tt">タイトルへ</button></div>`;
+    const head=kind==='win'?(grand?T('endGrandHead'):T('endWinHead',{name:p.name})):T('endRetireHead');
+    const unlockNote = humanWin && G.mode==='campaign' && !grand && (G.stage||0)+1<STAGES.length ? `<br>${T('unlocked',{s:T('st'+((G.stage||0)+1))})}` : '';
+    const body=(kind==='win'?(grand?T('endGrandBody'):T('endWinBody')):``)+`${extra}${unlockNote}<br>${T('titleName',{t:titleFor(floor)})}`;
+    ov.innerHTML=`<div class="sheet"><h1 style="font-size:20px">${head}</h1><p>${body}</p><button class="btn" id="again">${T('again')}</button><button class="btn sub" id="tt">${T('toTitle')}</button></div>`;
     $('#app').appendChild(ov); ov.querySelector('#again').onclick=()=>{ ov.remove(); AU('sfx','button'); startGame(); AU('playBGM',G.mode); };
     ov.querySelector('#tt').onclick=()=>{ ov.remove(); AU('sfx','button'); showTitle(); }; };
-  if(kind==='win'){ banner(grand?'CONGRATULATIONS!':'クリア！','var(--coin)'); AU('sfx','goal'); celebrate(grand); setTimeout(show, grand?2600:1500); }
-  else { banner('リタイア','var(--sub)'); AU('sfx','lose'); show(); }
+  if(kind==='win'){ banner(grand?'CONGRATULATIONS!':T('clearWord'),'var(--coin)'); AU('sfx','goal'); celebrate(grand); setTimeout(show, grand?2600:1500); }
+  else { banner(T('endRetireHead'),'var(--sub)'); AU('sfx','lose'); show(); }
 }
 
 // ============ 開始 ============
 function newP(i,name,isAI,mark){ return {id:i,name,isAI,color:PLAYER_COLORS[i%4],mark:mark||'あ',node:'n0',path:['n0'],
   coins:0,diamonds:0,cards:[],security:0,hp:0,hpMax:0,hpAcc:0,overshoots:0,milestones:[],finished:false,turn:{}}; }
 // ============ キャンペーン14段ラダー（クリアで次を解放） ============
+// 🔴段の名前/説明は i18n（st0〜st13 / sd0〜sd13）
 const STAGES=[
-  {name:'低い',             floors:20,  ai:0, brain:'normal', desc:'れんしゅうの塔。ひとりでのぼる'},
-  {name:'低くて難しい',     floors:20,  ai:1, brain:'normal', desc:'あいて1人'},
-  {name:'低め',             floors:30,  ai:2, brain:'normal', desc:'あいて2人'},
-  {name:'低めで難しい',     floors:30,  ai:2, brain:'high',   desc:'あいて2人・かしこい'},
-  {name:'中ぐらい',         floors:45,  ai:3, brain:'normal', desc:'あいて3人'},
-  {name:'中ぐらいで難しい', floors:45,  ai:3, brain:'high',   desc:'あいて3人・かしこい'},
-  {name:'やや高い',         floors:60,  ai:4, brain:'normal', desc:'あいて4人'},
-  {name:'やや高くて難しい', floors:60,  ai:4, brain:'high',   desc:'あいて4人・かしこい'},
-  {name:'高い',             floors:80,  ai:5, brain:'normal', desc:'あいて5人'},
-  {name:'高くて難しい',     floors:80,  ai:5, brain:'high',   desc:'あいて5人・かしこい'},
-  {name:'かなり高い',       floors:100, ai:6, brain:'normal', desc:'あいて6人'},
-  {name:'かなり高くて難しい',floors:100,ai:6, brain:'high',   desc:'あいて6人・かしこい'},
-  {name:'最高の高さ',       floors:130, ai:7, brain:'normal', desc:'あいて7人'},
-  {name:'最高の塔',         floors:130, ai:7, brain:'high',   desc:'あいて7人・かしこい。最後の挑戦'},
+  {floors:20,  ai:0, brain:'normal'},
+  {floors:20,  ai:1, brain:'normal'},
+  {floors:30,  ai:2, brain:'normal'},
+  {floors:30,  ai:2, brain:'high'},
+  {floors:45,  ai:3, brain:'normal'},
+  {floors:45,  ai:3, brain:'high'},
+  {floors:60,  ai:4, brain:'normal'},
+  {floors:60,  ai:4, brain:'high'},
+  {floors:80,  ai:5, brain:'normal'},
+  {floors:80,  ai:5, brain:'high'},
+  {floors:100, ai:6, brain:'normal'},
+  {floors:100, ai:6, brain:'high'},
+  {floors:130, ai:7, brain:'normal'},
+  {floors:130, ai:7, brain:'high'},
 ];
 function unlockedUpTo(){ return +(localStorage.getItem('gt_stage_unlocked')||0); }   // このindexまで挑戦可
 function clearedSet(){ return new Set(JSON.parse(localStorage.getItem('gt_stage_cleared')||'[]')); }
@@ -920,7 +962,7 @@ function renderStageList(){
     const locked=i>un;
     return `<button class="stagebtn${locked?' locked':''}${cl.has(i)?' cleared':''}" data-i="${i}" ${locked?'disabled':''}>
       <span class="snum">${locked?'🔒':i+1}</span>
-      <span class="sinfo">${s.name}<div class="sdesc">${s.floors}階 ／ ${s.desc}</div></span>
+      <span class="sinfo">${T('st'+i)}<div class="sdesc">${T('floorsUnit',{n:s.floors})} ／ ${T('sd'+i)}</div></span>
       ${cl.has(i)?'<span class="schk">✔</span>':''}</button>`;
   }).join('');
   list.querySelectorAll('.stagebtn:not(.locked)').forEach(b=>b.onclick=()=>{
@@ -930,16 +972,16 @@ function renderStageList(){
   G.stage=Math.min(G.stage??un, un);
 }
 function makePlayers(){ const arr=[],marks=['あ','B','C','D','E','F','G','H'];
-  if(G.mode==='solo'){ const p=newP(0,'あなた',false); p.hp=SOLO_HP0; p.hpMax=SOLO_HPMAX; arr.push(p); }
+  if(G.mode==='solo'){ const p=newP(0,T('you'),false); p.hp=SOLO_HP0; p.hpMax=SOLO_HPMAX; arr.push(p); }
   else if(G.mode==='friends'){
     const f=G.friends;
     for(let i=0;i<f.count;i++){ const nm=(f.names[i]||'').trim()||((i+1)+'P');
-      const q=newP(i, nm+'さん', false, nm.slice(0,2)); q.icon=f.icons[i]||null; arr.push(q); }
+      const q=newP(i, T('playerNameFmt',{name:nm}), false, nm.slice(0,2)); q.icon=f.icons[i]||null; arr.push(q); }
     let idx=f.count;
     for(let i=0;i<f.aiN && arr.length<8;i++){ const q=newP(idx,'AI'+(i+1),true,marks[idx%8]); q.brain='normal'; arr.push(q); idx++; }
-    for(let i=0;i<f.aiH && arr.length<8;i++){ const q=newP(idx,'かしこAI'+(i+1),true,marks[idx%8]); q.brain='high'; arr.push(q); idx++; }
+    for(let i=0;i<f.aiH && arr.length<8;i++){ const q=newP(idx,T('smartAi',{n:i+1}),true,marks[idx%8]); q.brain='high'; arr.push(q); idx++; }
   }
-  else{ const st=STAGES[G.stage||0]; arr.push(newP(0,'あなた',false));
+  else{ const st=STAGES[G.stage||0]; arr.push(newP(0,T('you'),false));
     for(let i=1;i<=st.ai;i++){ const q=newP(i,'AI'+i,true,marks[i]); q.brain=st.brain; arr.push(q); } }
   return arr; }
 function startGame(){
@@ -950,7 +992,7 @@ function startGame(){
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});
-  msg(G.mode==='solo'?'食料をとりながら、どこまでも登ろう':'頂上の宝箱にぴったり止まれ'); gameLoop();
+  msg(T(G.mode==='solo'?'msgStartSolo':'msgStartRace')); gameLoop();
 }
 // ============ せってい（保存・適用） ============
 const SET_DEF={fs:1,bgm:1,sfx:1,theme:'green',moveSpd:1,roulSpd:1};
@@ -979,7 +1021,20 @@ function openSettings(){ $('#setPanel').style.display='flex'; applySettings(); }
 $('#gearBtn').onclick=()=>{ audioBoot(); openSettings(); };
 $('#gearBtn2').onclick=()=>openSettings();
 $('#setClose').onclick=()=>{ $('#setPanel').style.display='none'; AU('sfx','button'); };
-$('#langBtn').onclick=()=>{ audioBoot(); msg&&0; alert('多言語は準備中です／Languages coming soon'); };
+// ============ 言語えらび（12言語・保存） ============
+function renderLangList(){
+  const list=$('#langList');
+  list.innerHTML=I18N_SAFE.order.map(lg=>`<button class="langbtn${lg===LANG?' on':''}" data-lg="${lg}">${I18N_SAFE.names[lg]||lg}</button>`).join('');
+  list.querySelectorAll('.langbtn').forEach(b=>b.onclick=()=>{
+    LANG=b.dataset.lg; applyLang(); renderLangList(); showTitleTexts(); AU('sfx','button');
+  });
+}
+function showTitleTexts(){  // タイトル画面の動的テキストを現在言語で更新
+  const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
+  $('#soloBest').textContent = best? T('soloBest',{f:best.floor,t:best.tiles,ti:titleFor(best.floor)}) : '';
+}
+$('#langBtn').onclick=()=>{ audioBoot(); renderLangList(); $('#langPanel').style.display='flex'; };
+$('#langClose').onclick=()=>{ $('#langPanel').style.display='none'; AU('sfx','button'); };
 // 速度倍率（moveSpd/roulSpd が大きいほど速い＝待ち時間を割る）
 function mvDelay(base){ return Math.max(20, base/(G.set.moveSpd||1)); }
 function rlDelay(base){ return Math.max(12, base/(G.set.roulSpd||1)); }
@@ -990,14 +1045,13 @@ function audioBoot(){ if(audioBooted){return;} audioBooted=true; AU('init'); AU(
 function showTitle(){
   $('#titleScreen').style.display='flex'; $('#modeConfig').style.display='none';
   G.running=false;
-  const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
-  $('#soloBest').textContent = best? `ソロ最高記録：${best.floor}階（${best.tiles}マス）／称号「${titleFor(best.floor)}」` : '';
+  showTitleTexts();
   if(audioBooted) AU('playBGM','title');
 }
 document.querySelectorAll('.modebtn').forEach(b=>b.onclick=()=>{
   audioBoot(); AU('sfx','button');
   G.mode=b.dataset.mode;
-  $('#mcTitle').textContent = G.mode==='campaign'?'対戦（AI）': G.mode==='friends'?'みんなで（スマホ交代）':'ソロ無限のぼり';
+  $('#mcTitle').textContent = T(G.mode==='campaign'?'mcCampaign': G.mode==='friends'?'mcFriends':'mcSolo');
   $('#optCampaign').style.display=G.mode==='campaign'?'block':'none';
   $('#optFriends').style.display=G.mode==='friends'?'block':'none';
   $('#optSolo').style.display=G.mode==='solo'?'block':'none';
@@ -1014,7 +1068,7 @@ function renderFriendRows(){
   rows.innerHTML=Array.from({length:f.count},(_,i)=>`
     <div class="frow">
       <div class="fava" data-i="${i}" style="${f.icons[i]?`background-image:url(${f.icons[i]})`:''}">${f.icons[i]?'':(f.names[i]||(i+1)+'P').slice(0,2)}</div>
-      <input class="fnick" data-i="${i}" maxlength="2" placeholder="${i+1}Pの名前(2文字)" value="${f.names[i]||''}">
+      <input class="fnick" data-i="${i}" maxlength="2" placeholder="${T('nickPh',{n:i+1})}" value="${f.names[i]||''}">
       <button class="fcam" data-i="${i}" aria-label="写真">📷</button>
     </div>`).join('');
   rows.querySelectorAll('.fnick').forEach(inp=>inp.oninput=()=>{ f.names[+inp.dataset.i]=inp.value.slice(0,2);
@@ -1033,7 +1087,7 @@ $('#photoIn').onchange=async e=>{
     img.close&&img.close();
     G.friends.icons[G._photoFor]=cv.toDataURL('image/png');
     renderFriendRows(); AU('sfx','button');
-  }catch(err){ msg('写真を読み込めなかった'); }
+  }catch(err){ msg(T('photoFail')); }
   G._photoFor=null;
 };
 $('#pcountSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('#pcountSeg').querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); G.pcount=+b.dataset.pc; G.friends.count=G.pcount; renderFriendRows(); AU('sfx','button'); });
@@ -1050,6 +1104,7 @@ $('#startBtn').onclick=()=>{
 };
 window.addEventListener('resize',()=>{ if(G.board) render(); });
 $('#appVer').textContent='v'+APP_VER;
+applyLang();
 applySettings();
 showTitle();
 // Farcaster Mini App: 準備完了を通知（web版のみ・失敗しても通常のWebページとして動く）
