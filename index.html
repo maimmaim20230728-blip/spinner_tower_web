@@ -383,7 +383,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.8.4';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.9.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
@@ -540,8 +540,24 @@ function extendFloors(b, toFloor, totalForHp, hasGoal){
     const mustFunnel = hasGoal && remaining<=n;             // 1レーンに絞り込む必要がある区間
     // 合流してよい相手＝分かれてから7階たった隣り合うレーン
     const oldPairs=[]; for(let i=0;i+1<n;i++) if(f-cur[i].forkFloor>=NO_MERGE_SPAN && f-cur[i+1].forkFloor>=NO_MERGE_SPAN) oldPairs.push(i);
-    let s=-1, m=-1;                                         // s=分岐するレーン, m=合流するレーン(mとm+1)
-    if(isGoalFloor){ /* 全レーン→ゴール1つ */ }
+    // 🔴ピラミッド型だけ特別：最初に一気に5分岐→ずっと5列→ゴール手前で合流→最後10マスは一本道
+    const pyr = !!(G.style && G.style.shape==='pyramid');
+    let want=null;
+    if(pyr && !isGoalFloor){
+      const wide=Math.min(5,MAX_LANE);
+      if(!hasGoal) want=wide;                                       // ソロ無限は広いまま
+      else { const singleFrom=Math.max(2, totalForHp-10);            // ここから上は一本道
+        if(nf>=singleFrom) want=1;
+        else if(nf>singleFrom-wide) want=Math.max(1,n-1);            // 合流していく
+        else want=wide; }
+    }
+    // s=分岐するレーン / sK=いくつに分かれるか(2〜5・🔴2つに限らない) / m=合流するレーン(mとm+1)
+    let s=-1, sK=2, m=-1;
+    if(isGoalFloor){ /* ゴール階は下で専用に組む */ }
+    else if(pyr){
+      if(want>n){ s=rand(0,n-1); sK=Math.min(want-n+1, MAX_LANE-n+1); if(sK<2) s=-1; }
+      else if(want<n && n>1){ m=rand(0,n-2); }
+    }
     else if(mustFunnel){ m = n>1 ? rand(0,n-2) : -1; }      // 絞り込みは年齢を問わず合流
     else{
       // 🔴アコーディオン型：細く→広がる(分岐)→しばらく保つ(7階ルール)→細くなる(合流)、をくり返す。
@@ -549,7 +565,9 @@ function extendFloors(b, toFloor, totalForHp, hasGoal){
       const newTarget=()=> Math.random()<0.65 ? rand(3,4) : MAX_LANE;         // 細めの周期を多くして分岐に出会いやすく
       if(!b.phase){ b.phase='grow'; b.targetW=newTarget(); b.holdLeft=0; }
       if(b.phase==='grow'){
-        if(n<b.targetW) s=rand(0,n-1);                                        // 分岐して広がる
+        if(n<b.targetW){ s=rand(0,n-1);
+          sK=rand(2, Math.max(2, Math.min(MAX_LANE, b.targetW-n+1)));         // 🔴一気に3〜5に分かれることもある
+          sK=Math.min(sK, MAX_LANE-n+1); }
         else { b.phase='hold'; b.holdLeft=NO_MERGE_SPAN+rand(0,1); }
       }
       if(b.phase==='hold'){
@@ -574,9 +592,10 @@ function extendFloors(b, toFloor, totalForHp, hasGoal){
         if(i===m && i+1<n){ const idx=newLanes.length;
           newLanes.push({forkFloor:Math.min(cur[i].forkFloor,cur[i+1].forkFloor)});
           childOf[i]=[idx]; childOf[i+1]=[idx]; i+=2; }
-        else if(i===s){ const a=newLanes.length; newLanes.push({forkFloor:cur[i].forkFloor});
-          const c=newLanes.length; newLanes.push({forkFloor:nf});             // 新しく分かれたレーン
-          childOf[i]=[a,c]; i++; }
+        else if(i===s){ const kids=[];
+          kids.push(newLanes.length); newLanes.push({forkFloor:cur[i].forkFloor});   // 元のレーンの続き
+          for(let k=1;k<sK;k++){ kids.push(newLanes.length); newLanes.push({forkFloor:nf}); }  // 新しく分かれたレーン(最大5)
+          childOf[i]=kids; i++; }
         else { const idx=newLanes.length; newLanes.push({forkFloor:cur[i].forkFloor}); childOf[i]=[idx]; i++; }
       }
     }
