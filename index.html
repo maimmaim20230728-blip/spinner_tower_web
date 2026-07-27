@@ -383,7 +383,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.9.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.0.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
@@ -618,8 +618,16 @@ function genBoard(numFloors,opts={}){
   const start=makeNode(b._idc++,0,1,0,'start',numFloors);
   b.nodes[start.id]=start; b.floors.push([start.id]); b.lanes=[{id:start.id,forkFloor:0}];
   extendFloors(b, numFloors, numFloors, hasGoal);
-  ensureBattleEscape(b); placeCardsBeforeDragons(b); if(hasGoal) ensureSafeRoute(b);
+  ensureBattleEscape(b); placeCardsBeforeDragons(b);
+  if(hasGoal){ clearNearGoal(b); ensureSafeRoute(b); }
   return b;
+}
+// 🔴頂上手前の直線には敵を置かない（敵は次のターンで復活するので、ゴール間近で足止めが続くと
+//    プラス札で最低出目が上がった人がぴったり止まれず永久に登れなくなる。実測でこれが詰みの原因だった）
+function clearNearGoal(b, span=8){
+  const from=b.numFloors-span;
+  for(const id in b.nodes){ const n=b.nodes[id];
+    if(n.floor>=from && n.type==='battle'){ n.type='coin'; n.enemyHP=0; } }
 }
 // 敵ゼロの逃げ道を保証（分岐のキモ）
 // 🔴リンクは足さない（足すと合流が増えて「分岐したら7階は合流しない」が壊れる）。マスの種類だけ変える。
@@ -807,6 +815,10 @@ function aiChoose(p,cands){
 function aiEndgamePrep(p){
   const high=p.brain==='high';
   const D=G.board.numFloors-G.board.nodes[p.node].floor;
+  // 🔴プラス札を重ねすぎて最低出目がゴールまでの距離を超えると、永久にぴったり止まれない。その時は手放す
+  if(D>0){ let guard=0;
+    while(rangeOf(p)[0]+plusOf(p)>D && guard++<60){
+      const i=p.cards.findIndex(k=>CARDS[k].plus); if(i<0) break; removeCard(p,i); } }
   if(high && D>14){
     // かしこいAIは大きく遅れたら上向きワープカードを惜しまず切る
     const behind=G.players.some(o=>o!==p && !o.finished && G.board.nodes[o.node].floor > G.board.nodes[p.node].floor+8);
@@ -948,7 +960,10 @@ async function enemyBattle(p,node){
   AU('sfx','battleStart'); showEnemy(node.enemyHP); await sleep(1000);
   const {val}=await doSpin(p,{label:T('fightLbl')});
   if(val>=node.enemyHP){ const loot=battleLoot(p,node.enemyHP); AU('sfx','win');
-    msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot})); node.type='cleared'; node.enemyHP=0; }
+    // 🔴倒した敵は隠れるだけ＝次のターンにまた出てくる（ヒロ仕様2026-07-28）
+    msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot}));
+    node.type='cleared'; node.hpHidden=node.enemyHP; node.enemyHP=0;
+    (G.hidden=G.hidden||[]).push({id:node.id, turn:G.turnNo||0}); }
   else{ const back=node.enemyHP-val; retreat(p,back); if(G.mode==='solo') p.hp-=back; AU('sfx','lose');
     const hpPart=G.mode==='solo'?T('battleLoseHp',{n:back}):'';
     // 🔴保険：同じ敵に3回負けたら助けのカードが入る（手前のカードマス=ヒロ案が主。これは稀な長期戦の尾を切る）
@@ -1095,16 +1110,34 @@ function cardInfo(p, i){
     <p class="tiny" style="font-weight:800;color:var(--ink);margin:2px 0">${kindLabel}</p>
     <p>${cardDesc(k)}</p>
     ${usableNow?`<button class="btn" id="ci-use">${T('useThisCard')}</button>`:''}
+    <button class="btn sub" id="ci-drop">${T('discardCard')}</button>
     <button class="btn sub" id="ci-close">${usableNow?T('cancel'):T('close')}</button></div>`;
   $('#app').appendChild(ov);
   if(usableNow) ov.querySelector('#ci-use').onclick=()=>{ ov.remove(); useCard(p,i); };
+  // 🔴カードは手放せる（プラス札を重ねすぎて出目が大きくなり、ゴールにぴったり止まれなくなるのを自分で直せる）
+  ov.querySelector('#ci-drop').onclick=()=>{ const nm=cardName(k); removeCard(p,i); ov.remove();
+    msg(T('discarded',{card:nm})); AU('sfx','button'); renderHand(); updateHUD(); };
   ov.querySelector('#ci-close').onclick=()=>ov.remove();
 }
 
 // ============ ターン ============
 function currentPlayer(){ return G.players[G.turn]; }
 function advanceTurn(){ G.turn=(G.turn+1)%G.players.length; }
+// 🔴隠れた敵を次のターンで復活させる
+function reviveEnemies(){
+  if(!G.hidden||!G.hidden.length) return false;
+  const now=G.turnNo||0; const keep=[]; let back=0;
+  for(const h of G.hidden){
+    const n=G.board.nodes[h.id];
+    if(!n){ continue; }
+    if(now>h.turn && n.type==='cleared'){ n.type='battle'; n.enemyHP=n.hpHidden||enemyHPFor(n.floor); n.hpHidden=0; back++; }
+    else keep.push(h);
+  }
+  G.hidden=keep; return back>0;
+}
 async function takeTurn(p){
+  G.turnNo=(G.turnNo||0)+1;
+  if(reviveEnemies()) render();                 // 隠れていた敵がもどる
   p.turn={}; banner(T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name}),p.color); autoScroll(p); renderHand(); await sleep(300);
   if(p.isAI) aiEndgamePrep(p);
   const {val}=await doSpin(p,{label:T('moveLbl')});
@@ -1261,6 +1294,7 @@ function startGame(){
   else if(G.mode==='friends'){ numFloors=G.friends.height||45; }
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
+  G.turnNo=0; G.hidden=[];                            // 隠れた敵の管理をリセット
   G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
   AU('playBGM', (G.style&&G.style.bgm)||G.mode);      // 🔴BGMは塔の種類ごと
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});
