@@ -370,7 +370,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.5.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.6.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
@@ -694,7 +694,15 @@ function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.b
 function waitFor(type,extra={}){ return new Promise(res=>{ G.wait={type,resolve:res,...extra}; onWaitChange(); }); }
 function resolveWait(v){ const w=G.wait; G.wait=null; onWaitChange(); if(w) w.resolve(v); }
 function onWaitChange(){ const w=G.wait; $('#spinBtn').disabled=!(w&&w.type==='spin');
-  if(w&&w.type==='branch'){ msg(T('branchMsg')); render(); } renderHand(); }
+  if(w&&w.type==='branch'){ msg(w.dest?T('destMsg',{n:w.steps}):T('branchMsg')); render();
+    if(w.dest) scrollToShow(w.candidates); } renderHand(); }
+// 候補が画面の外に出ないよう、いちばん上の候補が見える位置までスクロール
+function scrollToShow(ids){
+  const b=G.board; if(!b) return; const H=(b.numFloors+1)*FLOOR_H+24;
+  let top=0; ids.forEach(id=>{ const n=b.nodes[id]; if(n && n.floor>top) top=n.floor; });
+  const y=H-(top*FLOOR_H+PAD_B+NODE/2);
+  scrollEl.scrollTo({top:Math.max(0,y-scrollEl.clientHeight*0.30),behavior:'smooth'});
+}
 $('#spinBtn').onclick=()=>{ if(G.wait&&G.wait.type==='spin') resolveWait(true); };
 
 // ============ ルーレット ============
@@ -744,9 +752,59 @@ function chooseDistance(p,max){ return new Promise(res=>{ const ov=document.crea
   ov.querySelectorAll('.dbtn').forEach(x=>x.onclick=()=>{ ov.remove(); res(+x.dataset.d); }); $('#app').appendChild(ov); }); }
 function aiFreeDist(p,raw){ const D=G.board.numFloors-G.board.nodes[p.node].floor; return (D>=1&&D<=raw)?D:raw; }
 
+// 🔴出た目の分だけ先まで見て「行ける終着マス」を全部だす（分岐のたびに止めない・ヒロ案2026-07-28）
+//   途中で敵に当たったらそこで強制ストップ＝そこが終着。ゴールは通り過ぎられない（ぴったりでなければはね返る）。
+function reachableDestinations(p,steps,ctx){
+  const b=G.board; let frontier=[{node:p.node,path:[]}]; const out=[];
+  for(let s=0;s<steps;s++){
+    const next=[];
+    for(const st of frontier){
+      const n=b.nodes[st.node], nx=n.next;
+      if(!nx.length){ out.push({id:st.node,path:st.path}); continue; }
+      for(const t of nx){
+        const tn=b.nodes[t], np=st.path.concat([t]);
+        if(tn.type==='goal'){ out.push({id:t,path:np,goal:true,atStep:s+1}); continue; }
+        if(!ctx.phantom && tn.type==='battle'){ out.push({id:t,path:np}); continue; }   // 敵で強制ストップ
+        next.push({node:t,path:np});
+      }
+    }
+    frontier=next; if(!frontier.length) break;
+  }
+  frontier.forEach(st=>out.push({id:st.node,path:st.path}));
+  const uniq={}; out.forEach(o=>{ if(!uniq[o.id]) uniq[o.id]=o; });
+  return Object.values(uniq).filter(o=>o.path.length);
+}
+async function walkPath(p,path){
+  for(const t of path){
+    p.node=t; p.path.push(t); AU('sfx','move');
+    if(G.mode==='solo'){ p.hpAcc+=hasCandy(p)?0.5:1; while(p.hpAcc>=1){p.hp--;p.hpAcc--;} if(p.hp<=0){ render(); return 'retire'; } }
+    render(); autoScroll(p); await sleep(mvDelay(170));
+    if(G.mode==='solo'){
+      const fl=G.board.nodes[p.node].floor;
+      for(const m of TITLE_MILESTONES){ if(fl>=m && !p.milestones.includes(m)){ p.milestones.push(m); await titleCelebration(m); } }
+      maybeExtendSolo(p);
+    }
+  }
+}
 async function movePlayer(p,rawSteps,ctx){
   ctx=ctx||{}; let steps=rawSteps;
   if(ctx.free) steps = p.isAI? aiFreeDist(p,rawSteps) : await chooseDistance(p,rawSteps);
+  // 人が動かす時（フリームーブ以外）は、行きたい終着マスを1回タップするだけで進む
+  if(!p.isAI && !(ctx.freemove||hasFreemove(p)) && steps>0){
+    if(G.mode==='solo') maybeExtendSolo(p);           // 先に盤を伸ばしてから候補を出す
+    const dests=reachableDestinations(p,steps,ctx);
+    if(!dests.length) return;
+    let chosen;
+    if(dests.length===1) chosen=dests[0];
+    else { const id=await waitFor('branch',{candidates:dests.map(d=>d.id),dest:true,steps});
+      chosen=dests.find(d=>d.id===id) || dests[0]; }
+    const r=await walkPath(p,chosen.path);
+    if(r==='retire') return 'retire';
+    if(chosen.goal && chosen.atStep<steps){          // ぴったりでなければはね返る
+      retreat(p,steps-chosen.atStep); render(); autoScroll(p); msg(T('overshoot')); await sleep(mvDelay(300));
+    }
+    return;
+  }
   for(let s=0;s<steps;s++){
     const n=G.board.nodes[p.node]; if(n.type==='goal') break;
     let nexts;
