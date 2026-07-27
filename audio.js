@@ -76,6 +76,29 @@
     }
   }
 
+  // 音程が動く1音（水滴の跳ね上がり・太鼓の落ち込みなど）
+  function glide(tr, time, midiFrom, midiTo, dur, type, level, wet) {
+    var o = ctx.createOscillator();
+    var g = ctx.createGain();
+    o.type = type;
+    o.frequency.setValueAtTime(mtof(midiFrom), time);
+    o.frequency.exponentialRampToValueAtTime(mtof(midiTo), time + dur);
+    g.gain.setValueAtTime(0.0001, time);
+    g.gain.linearRampToValueAtTime(level, time + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    o.connect(g);
+    g.connect(tr.gain);
+    if (wet) g.connect(tr.delay);
+    o.start(time);
+    o.stop(time + dur + 0.03);
+  }
+
+  // 鐘・グロッケン風（基音＋高い倍音の2音だけで金属質を出す）
+  function bell(tr, time, midi, dur, level) {
+    voice(tr, time, midi, dur, 'sine', level, true);
+    voice(tr, time, midi + 19, dur * 0.5, 'sine', level * 0.4, true);
+  }
+
   // --- 各BGMのステップ関数（step: 16分音符単位） ---------------------------
 
   // タイトル：少し長く壮大な冒険の始まり（Cメジャー・8小節）
@@ -146,12 +169,124 @@
     }
   }
 
-  // BGM定義（bpm・小節数・ステップ関数）
+  // --- 塔のスキン別BGM（tower_*） ------------------------------------------
+
+  // 石の塔：どっしり重厚。低い5度パッド＋ゆっくりした鐘（Dマイナー・4小節）
+  var STONE_CH = [
+    [38, 45, 50], [36, 43, 48], [34, 41, 46], [36, 43, 48]
+  ];
+  function stepTowerStone(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = STONE_CH[bar];
+    if (p === 0) pad(tr, t, ch, 4.6, 'triangle', 0.09);            // 小節をまたぐ重いパッド
+    if (p === 0 || p === 8) voice(tr, t, ch[0], 0.8, 'sine', 0.20, false); // 石を踏む鈍い拍
+    if (p === 8) voice(tr, t, ch[1], 0.7, 'triangle', 0.05, false); // 堅い軋み
+    // 2小節に1度だけ鳴る鐘
+    if (p === 0 && bar % 2 === 0) bell(tr, t, (bar === 0 ? ch[2] : ch[1]) + 12, 3.0, 0.10);
+  }
+
+  // レンガの塔：温かみのある中世風。素朴な行進（Dドリアン・4小節）
+  var BRICK_CH = [
+    [50, 53, 57], [48, 52, 55], [53, 57, 60], [55, 59, 62]
+  ];
+  var BRICK_MEL = [                                                // 8分音符8つ（0＝休符）
+    [69, 0, 67, 65, 62, 0, 65, 67],
+    [64, 0, 67, 0, 64, 62, 60, 0],
+    [65, 0, 69, 0, 72, 69, 65, 0],
+    [67, 0, 71, 69, 67, 0, 62, 0]
+  ];
+  function stepTowerBrick(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = BRICK_CH[bar];
+    if (p === 0 || p === 8) pad(tr, t, ch, 0.5, 'triangle', 0.06); // 短く刻む和音＝行進感
+    // 4分の行進ベース（根音と5度を交互に）
+    if (p % 4 === 0) voice(tr, t, ((p / 4) % 2 === 0 ? ch[0] : ch[2]) - 12, 0.24, 'square', 0.16, false);
+    // 素朴な笛のメロディ
+    if (p % 2 === 0) {
+      var n = BRICK_MEL[bar][p / 2];
+      if (n) voice(tr, t, n, 0.22, 'triangle', 0.11, true);
+    }
+  }
+
+  // 苔むす古塔：しっとり静か。柔らかいパッドと水滴（Aマイナー・4小節）
+  var MOSS_CH = [
+    [45, 52, 57], [43, 50, 55], [41, 48, 55], [40, 47, 52]
+  ];
+  var MOSS_DROP = [[3, 11], [6], [2, 9, 13], [7]];                 // 水滴が落ちる位置（不揃い）
+  var MOSS_PENT = [76, 79, 81, 84, 79];                            // 水滴の音（ペンタトニック）
+  function stepTowerMoss(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = MOSS_CH[bar];
+    if (p === 0) pad(tr, t, ch, 4.4, 'sine', 0.10);                // 湿った空気のパッド
+    if (p === 8) voice(tr, t, ch[1], 2.0, 'sine', 0.05, true);     // かすかな揺らぎ
+    if (MOSS_DROP[bar].indexOf(p) >= 0) {                          // 水滴（跳ね上がる単音）
+      var n = MOSS_PENT[(bar + p) % MOSS_PENT.length];
+      glide(tr, t, n - 5, n, 0.22, 'sine', 0.10, true);
+    }
+  }
+
+  // 砂の遺跡：乾いた異国情緒。ハーモニックマイナー＋太鼓（Aハーモニックマイナー・4小節）
+  var SAND_CH = [
+    [45, 52, 57], [45, 52, 60], [45, 53, 57], [45, 52, 56]
+  ];
+  var SAND_TEK = [3, 6, 11, 14];                                   // 高い打点（3-3-2系）
+  var SAND_MEL = [
+    [69, 71, 72, 0, 74, 72, 71, 0],
+    [72, 0, 74, 76, 77, 76, 74, 0],
+    [77, 0, 76, 77, 80, 0, 77, 76],
+    [74, 72, 71, 0, 69, 0, 68, 0]
+  ];
+  function stepTowerSand(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = SAND_CH[bar];
+    if (p === 0) pad(tr, t, ch, 2.3, 'triangle', 0.05);            // 薄いドローン
+    if (p === 0 || p === 8) glide(tr, t, 45, 33, 0.18, 'sine', 0.28, false);          // 低い太鼓
+    else if (SAND_TEK.indexOf(p) >= 0) glide(tr, t, 72, 60, 0.07, 'triangle', 0.15, false); // 乾いた高音
+    if (p % 2 === 0) {                                             // エキゾチックな旋律
+      var n = SAND_MEL[bar][p / 2];
+      if (n) voice(tr, t, n, 0.16, 'square', 0.09, true);
+    }
+  }
+
+  // 蒼氷の塔：澄んで冷たい。高音のベルと長いディレイ（Eメジャー・4小節）
+  var ICE_CH = [
+    [52, 59, 64], [54, 61, 66], [56, 63, 68], [49, 56, 61]
+  ];
+  var ICE_MEL = [
+    [88, 0, 83, 0, 85, 0, 0, 80],
+    [85, 0, 80, 0, 83, 0, 78, 0],
+    [80, 0, 83, 0, 88, 0, 0, 85],
+    [83, 0, 78, 0, 76, 0, 0, 83]
+  ];
+  function stepTowerIce(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = ICE_CH[bar];
+    if (p === 0) pad(tr, t, ch, 3.0, 'sine', 0.07);                // 広がるパッド
+    if (p === 0) voice(tr, t, ch[0] - 12, 1.4, 'sine', 0.11, false); // 冷たい低音
+    if (p % 4 === 2) voice(tr, t, ch[2] + 24, 0.12, 'sine', 0.04, true); // かすかな霜のきらめき
+    if (p % 2 === 0) {                                             // グロッケン風の主旋律
+      var n = ICE_MEL[bar][p / 2];
+      if (n) bell(tr, t, n, 0.9, 0.08);
+    }
+  }
+
+  // BGM定義（bpm・小節数・ステップ関数／dly,fb,wet はディレイの任意調整）
   var BGM = {
     title:    { bpm: 92,  bars: 8, step: stepTitle },
     campaign: { bpm: 122, bars: 4, step: stepCampaign },
     friends:  { bpm: 128, bars: 4, step: stepFriends },
-    solo:     { bpm: 74,  bars: 4, step: stepSolo }
+    solo:     { bpm: 74,  bars: 4, step: stepSolo },
+    // 塔のスキン別
+    tower_stone: { bpm: 54,  bars: 4, step: stepTowerStone, dly: 0.75, fb: 0.22, wet: 0.45 },
+    tower_brick: { bpm: 104, bars: 4, step: stepTowerBrick, dly: 0.5,  fb: 0.18, wet: 0.35 },
+    tower_moss:  { bpm: 60,  bars: 4, step: stepTowerMoss,  dly: 0.75, fb: 0.34, wet: 0.60 },
+    tower_sand:  { bpm: 112, bars: 4, step: stepTowerSand,  dly: 0.5,  fb: 0.15, wet: 0.28 },
+    tower_ice:   { bpm: 84,  bars: 4, step: stepTowerIce,   dly: 0.5,  fb: 0.42, wet: 0.62 }
   };
 
   // トラックを作る（ディレイ付きのバスと専用スケジューラ）
@@ -161,13 +296,13 @@
     g.gain.value = 1;
     g.connect(bgmGain);
 
-    // ゆるいディレイ（残響感）
+    // ゆるいディレイ（残響感／曲ごとに深さを変えられる）
     var delay = ctx.createDelay(1.0);
-    delay.delayTime.value = 60 / cfg.bpm * 0.75; // 付点8分ディレイ
+    delay.delayTime.value = 60 / cfg.bpm * (cfg.dly == null ? 0.75 : cfg.dly); // 既定は付点8分
     var fb = ctx.createGain();
-    fb.gain.value = 0.25;
+    fb.gain.value = cfg.fb == null ? 0.25 : cfg.fb;
     var wet = ctx.createGain();
-    wet.gain.value = 0.5;
+    wet.gain.value = cfg.wet == null ? 0.5 : cfg.wet;
     delay.connect(fb); fb.connect(delay);        // フィードバックループ
     delay.connect(wet); wet.connect(g);
 
@@ -345,7 +480,9 @@
 
     // ループBGM開始（前のBGMは短くクロスフェード）
     playBGM: function (key) {
-      if (!started || !ctx || !BGM[key]) return;
+      if (!started || !ctx) return;
+      // 未知のキーはキャンペーン曲にフォールバック（落とさない）
+      if (!Object.prototype.hasOwnProperty.call(BGM, key)) key = 'campaign';
       if (track && track.key === key) return;   // 同じ曲なら継続
       if (track) fadeOutTrack(track);
       startTrack(key);

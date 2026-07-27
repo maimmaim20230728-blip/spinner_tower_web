@@ -229,6 +229,9 @@
   .fnick{flex:1; min-width:0; padding:9px 10px; border:2px solid var(--line); border-radius:10px; font-size:16px;
     font-weight:800; text-align:center; background:var(--card); color:var(--ink);}
   .fcam{width:44px; height:40px; border:2px solid var(--line); border-radius:10px; background:var(--paper); font-size:17px; flex:0 0 auto;}
+  .nameinput{width:100%; padding:11px 12px; border:2px solid var(--line); border-radius:10px;
+    font-size:calc(16px*var(--fs)); font-weight:800; background:var(--card); color:var(--ink);}
+  .nameinput:focus{outline:none; border-color:var(--accent);}
   .tok.hasicon{background-size:cover; background-position:center; color:transparent;}
 
   /* ===== キャンペーン段選択 ===== */
@@ -311,6 +314,10 @@
   <div class="overlay" id="modeConfig" style="display:none">
     <div class="sheet">
       <h2 id="mcTitle">対戦（AI）</h2>
+      <div id="nameRow" class="setrow">
+        <div class="sl" data-i18n="yourName">あなたの名前</div>
+        <input id="myName" class="nameinput" maxlength="12" placeholder="">
+      </div>
       <div id="optCampaign">
         <div class="tiny" style="text-align:left;font-weight:800;color:var(--ink)" data-i18n="stageChoose">塔をえらぶ（クリアで次がひらく）</div>
         <div id="stageList" style="max-height:46vh;overflow-y:auto;margin:8px 0;"></div>
@@ -376,7 +383,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.7.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.8.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
@@ -402,12 +409,13 @@ const ENEMIES={2:{k:'enemy2',e:'🟢'},3:{k:'enemy3',e:'🐛'},4:{k:'enemy4',e:'
   5:{k:'enemy5',e:'🦊'},6:{k:'enemy6',e:'🐻'},7:{k:'enemy7',e:'🦅'},8:{k:'enemy8',e:'🐉'}};
 const enemyName=hp=>ENEMIES[hp]?T(ENEMIES[hp].k):T('enemyUnknown');
 
+// 塔のスキン。bgmキーは塔ごとの曲（audio.js側で作り分け）
 const STYLES=[
-  {name:'石の塔',brick:'#9aa2a8',mortar:'#6f767c',cap:'#c4cace',shape:'tower'},
-  {name:'レンガの塔',brick:'#b46a4a',mortar:'#7f4a34',cap:'#d98f6e',shape:'tower'},
-  {name:'苔むす古塔',brick:'#7f9a68',mortar:'#566f46',cap:'#a6c088',shape:'tower'},
-  {name:'砂の遺跡',brick:'#d8b877',mortar:'#b2955c',cap:'#ecd6a0',shape:'pyramid'},
-  {name:'蒼氷の塔',brick:'#8fc6dd',mortar:'#5f97b0',cap:'#c3e6f2',shape:'tower'},
+  {name:'石の塔',brick:'#9aa2a8',mortar:'#6f767c',cap:'#c4cace',shape:'tower',bgm:'tower_stone'},
+  {name:'レンガの塔',brick:'#b46a4a',mortar:'#7f4a34',cap:'#d98f6e',shape:'tower',bgm:'tower_brick'},
+  {name:'苔むす古塔',brick:'#7f9a68',mortar:'#566f46',cap:'#a6c088',shape:'tower',bgm:'tower_moss'},
+  {name:'砂の遺跡',brick:'#d8b877',mortar:'#b2955c',cap:'#ecd6a0',shape:'pyramid',bgm:'tower_sand'},
+  {name:'蒼氷の塔',brick:'#8fc6dd',mortar:'#5f97b0',cap:'#c3e6f2',shape:'tower',bgm:'tower_ice'},
 ];
 const CHEST_SVG=`<svg viewBox="0 0 52 42" width="46" height="37" xmlns="http://www.w3.org/2000/svg">
   <rect x="5" y="18" width="42" height="21" rx="3" fill="#8a5a2b" stroke="#5a3a1c" stroke-width="2"/>
@@ -1123,7 +1131,7 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
     const unlockNote = humanWin && G.mode==='campaign' && !grand && (G.stage||0)+1<STAGES.length ? `<br>${T('unlocked',{s:T('st'+((G.stage||0)+1))})}` : '';
     const body=(kind==='win'?(grand?T('endGrandBody'):T('endWinBody')):``)+`${extra}${unlockNote}<br>${T('titleName',{t:titleFor(floor)})}`;
     ov.innerHTML=`<div class="sheet"><h1 style="font-size:20px">${head}</h1><p>${body}</p><button class="btn" id="again">${T('again')}</button><button class="btn sub" id="tt">${T('toTitle')}</button></div>`;
-    $('#app').appendChild(ov); ov.querySelector('#again').onclick=()=>{ ov.remove(); AU('sfx','button'); startGame(); AU('playBGM',G.mode); };
+    $('#app').appendChild(ov); ov.querySelector('#again').onclick=()=>{ ov.remove(); AU('sfx','button'); startGame(); };
     ov.querySelector('#tt').onclick=()=>{ ov.remove(); AU('sfx','button'); showTitle(); }; };
   if(kind==='win'){ banner(grand?'CONGRATULATIONS!':T('clearWord'),'var(--coin)'); AU('sfx','goal'); celebrate(grand); setTimeout(show, grand?2600:1500); }
   else { banner(T('endRetireHead'),'var(--sub)'); AU('sfx','lose'); show(); }
@@ -1174,18 +1182,26 @@ function renderStageList(){
   G.stage=Math.min(G.stage??un, un);
   mark(G.stage);   // 既定の選択を必ず見せる（未選択に見えないように）
 }
-function makePlayers(){ const arr=[],marks=['あ','B','C','D','E','F','G','H'];
-  if(G.mode==='solo'){ const p=newP(0,T('you'),false); p.hp=SOLO_HP0; p.hpMax=SOLO_HPMAX; arr.push(p); }
+// 自分の名前は保存して次回も使う（母国語でOK）。空なら「あなた」
+function myName(){ return (localStorage.getItem('gt_name')||'').trim() || T('you'); }
+// 対戦相手の名前はアルファベット2文字（かぶらないように）
+function aiNames(n){ const used=new Set(), out=[];
+  while(out.length<n){ const s=String.fromCharCode(65+rand(0,25))+String.fromCharCode(65+rand(0,25));
+    if(!used.has(s)){ used.add(s); out.push(s); } }
+  return out; }
+function makePlayers(){ const arr=[];
+  if(G.mode==='solo'){ const nm=myName(); const p=newP(0,nm,false,nm.slice(0,2)); p.hp=SOLO_HP0; p.hpMax=SOLO_HPMAX; arr.push(p); }
   else if(G.mode==='friends'){
     const f=G.friends;
     for(let i=0;i<f.count;i++){ const nm=(f.names[i]||'').trim()||((i+1)+'P');
       const q=newP(i, T('playerNameFmt',{name:nm}), false, nm.slice(0,2)); q.icon=f.icons[i]||null; arr.push(q); }
-    let idx=f.count;
-    for(let i=0;i<f.aiN && arr.length<8;i++){ const q=newP(idx,'AI'+(i+1),true,marks[idx%8]); q.brain='normal'; arr.push(q); idx++; }
-    for(let i=0;i<f.aiH && arr.length<8;i++){ const q=newP(idx,T('smartAi',{n:i+1}),true,marks[idx%8]); q.brain='high'; arr.push(q); idx++; }
+    const names=aiNames(f.aiN+f.aiH); let idx=f.count, k=0;
+    for(let i=0;i<f.aiN && arr.length<8;i++,k++){ const q=newP(idx,names[k],true,names[k]); q.brain='normal'; arr.push(q); idx++; }
+    for(let i=0;i<f.aiH && arr.length<8;i++,k++){ const q=newP(idx,names[k],true,names[k]); q.brain='high'; arr.push(q); idx++; }
   }
-  else{ const st=STAGES[G.stage||0]; arr.push(newP(0,T('you'),false));
-    for(let i=1;i<=st.ai;i++){ const q=newP(i,'AI'+i,true,marks[i]); q.brain=st.brain; arr.push(q); } }
+  else{ const st=STAGES[G.stage||0]; const nm=myName(); arr.push(newP(0,nm,false,nm.slice(0,2)));
+    const names=aiNames(st.ai);
+    for(let i=1;i<=st.ai;i++){ const q=newP(i,names[i-1],true,names[i-1]); q.brain=st.brain; arr.push(q); } }
   return arr; }
 function startGame(){
   $('#titleScreen').style.display='none'; $('#stamwrap').style.display=G.mode==='solo'?'block':'none'; G.style=pick(STYLES);
@@ -1195,6 +1211,7 @@ function startGame(){
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
   G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
+  AU('playBGM', (G.style&&G.style.bgm)||G.mode);      // 🔴BGMは塔の種類ごと
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});
   msg(T(G.mode==='solo'?'msgStartSolo':'msgStartRace'));
   (async()=>{ await decideOrder(); gameLoop(); })();   // 先にルーレットでじゅんばんを決める
@@ -1262,6 +1279,10 @@ document.querySelectorAll('.modebtn').forEach(b=>b.onclick=()=>{
   $('#optSolo').style.display=G.mode==='solo'?'block':'none';
   if(G.mode==='campaign') renderStageList();
   if(G.mode==='friends') renderFriendRows();
+  // 自分の名前：みんなで以外で入力（前回の名前が入った状態で出る＝押すだけ）
+  $('#nameRow').style.display = G.mode==='friends'?'none':'block';
+  $('#myName').value = (localStorage.getItem('gt_name')||'');
+  $('#myName').placeholder = T('namePh');
   $('#modeConfig').style.display='flex';
 });
 $('#mcBack').onclick=()=>{ AU('sfx','button'); $('#modeConfig').style.display='none'; };
@@ -1270,13 +1291,15 @@ G.friends={count:2, names:['',''], icons:[null,null], aiN:0, aiH:0, height:45};
 function renderFriendRows(){
   const f=G.friends; const rows=$('#friendRows');
   while(f.names.length<f.count){ f.names.push(''); f.icons.push(null); }
+  // 1人目はこの端末の持ち主とみなして、記憶している名前を最初から入れておく
+  if(!f.names[0]) f.names[0]=(localStorage.getItem('gt_name')||'').trim();
   rows.innerHTML=Array.from({length:f.count},(_,i)=>`
     <div class="frow">
       <div class="fava" data-i="${i}" style="${f.icons[i]?`background-image:url(${f.icons[i]})`:''}">${f.icons[i]?'':(f.names[i]||(i+1)+'P').slice(0,2)}</div>
-      <input class="fnick" data-i="${i}" maxlength="2" placeholder="${T('nickPh',{n:i+1})}" value="${f.names[i]||''}">
+      <input class="fnick" data-i="${i}" maxlength="12" placeholder="${T('nickPh',{n:i+1})}" value="${f.names[i]||''}">
       <button class="fcam" data-i="${i}" aria-label="写真">📷</button>
     </div>`).join('');
-  rows.querySelectorAll('.fnick').forEach(inp=>inp.oninput=()=>{ f.names[+inp.dataset.i]=inp.value.slice(0,2);
+  rows.querySelectorAll('.fnick').forEach(inp=>inp.oninput=()=>{ f.names[+inp.dataset.i]=inp.value;   // 名前は母国語でOK（コマには先頭2文字）
     const av=rows.querySelector(`.fava[data-i="${inp.dataset.i}"]`); if(av && !f.icons[+inp.dataset.i]) av.textContent=(inp.value||(+inp.dataset.i+1)+'P').slice(0,2); });
   rows.querySelectorAll('.fcam').forEach(btn=>btn.onclick=()=>{ G._photoFor=+btn.dataset.i; $('#photoIn').click(); });
 }
@@ -1303,9 +1326,11 @@ $('#pcountSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('#pcount
 });
 $('#startBtn').onclick=()=>{
   audioBoot(); AU('sfx','button');
+  // 名前を記憶（次にやる時は入った状態で出る）
+  if(G.mode!=='friends'){ localStorage.setItem('gt_name', ($('#myName').value||'').trim()); }
+  else { const v=(G.friends.names[0]||'').trim(); if(v) localStorage.setItem('gt_name', v); }   // みんなでは1人目＝端末の持ち主
   $('#modeConfig').style.display='none'; $('#titleScreen').style.display='none';
   startGame();
-  AU('playBGM', G.mode);
 };
 window.addEventListener('resize',()=>{ if(G.board) render(); });
 $('#appVer').textContent='v'+APP_VER;
