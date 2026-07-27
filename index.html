@@ -368,7 +368,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.1.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.2.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_MAX=12, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
@@ -495,42 +495,101 @@ function makeNode(idc,f,lanes,l,type,total){
   if(type==='battle') n.enemyHP=enemyHPFor(f,total);
   return n;
 }
-function genBoard(numFloors,opts={}){
-  const nodes={},floors=[]; let idc=0; const hasGoal=opts.hasGoal!==false; let w=rand(2,3);
-  for(let f=0;f<=numFloors;f++){
-    let lanes;
-    if(f===0) lanes=1;
-    else if(f===numFloors && hasGoal) lanes=1;
-    else { if(Math.random()<0.16) w+=pick([-1,1]); w=clamp(w,1,5); lanes=w; }  // 幅は長め持続=合流減
-    const arr=[];
-    for(let l=0;l<lanes;l++){ const t=f===0?'start':(f===numFloors&&hasGoal)?'goal':rollType();
-      const n=makeNode(idc++,f,lanes,l,t,numFloors); nodes[n.id]=n; arr.push(n.id); }
-    floors.push(arr);
-  }
-  const board={nodes,floors,numFloors,hasGoal,_idc:idc};
-  linkFloors(nodes,floors,0); ensureBattleEscape(board); if(hasGoal) ensureSafeRoute(board);
-  return board;
-}
 function laneFrac(i,c){ return c<=1?0.5:i/(c-1); }
-function linkFloors(nodes,floors,from){
-  for(let f=from;f<floors.length-1;f++){
-    const cur=floors[f],nxt=floors[f+1];
-    cur.forEach(id=>{ const node=nodes[id]; node.next=[]; const p=laneFrac(node.lane,node.laneCount);
-      const order=[...nxt].sort((a,b)=>Math.abs(laneFrac(nodes[a].lane,nodes[a].laneCount)-p)-Math.abs(laneFrac(nodes[b].lane,nodes[b].laneCount)-p));
-      const cnt=(nxt.length>1 && Math.random()<0.10)?2:1;   // 2本目リンクは控えめ＝合流少なめ
-      node.next=order.slice(0,Math.min(cnt,nxt.length)); });
-    nxt.forEach(nid=>{ if(!cur.some(id=>nodes[id].next.includes(nid))){
-      const np=laneFrac(nodes[nid].lane,nodes[nid].laneCount); let best=cur[0],bd=1e9;
-      cur.forEach(id=>{const d=Math.abs(laneFrac(nodes[id].lane,nodes[id].laneCount)-np); if(d<bd){bd=d;best=id;}});
-      nodes[best].next.push(nid); } });
+
+// ============ 盤面のレーン生成 ============
+// 🔴設計(ヒロ仕様)：分岐は多く出す。ただし「分岐したら7階は合流させない」。
+//   grow=分岐が生まれる / swap=分岐しつつ古いレーン同士だけ合流(幅は同じ) / shrink=合流 / same=1本道
+//   各レーンは forkFloor(そのレーンが分かれた階)を持ち、7階たっていないレーンは合流の相手にしない。
+const MAX_LANE=5, NO_MERGE_SPAN=7;
+function extendFloors(b, toFloor, totalForHp, hasGoal){
+  for(let f=b.floors.length-1; f<toFloor; f++){
+    const cur=b.lanes, n=cur.length, nf=f+1;
+    const isGoalFloor = hasGoal && nf===totalForHp;
+    const remaining = totalForHp - f;                       // 頂上までの残り階
+    const mustFunnel = hasGoal && remaining<=n;             // 1レーンに絞り込む必要がある区間
+    // 合流してよい相手＝分かれてから7階たった隣り合うレーン
+    const oldPairs=[]; for(let i=0;i+1<n;i++) if(f-cur[i].forkFloor>=NO_MERGE_SPAN && f-cur[i+1].forkFloor>=NO_MERGE_SPAN) oldPairs.push(i);
+    let s=-1, m=-1;                                         // s=分岐するレーン, m=合流するレーン(mとm+1)
+    if(isGoalFloor){ /* 全レーン→ゴール1つ */ }
+    else if(mustFunnel){ m = n>1 ? rand(0,n-2) : -1; }      // 絞り込みは年齢を問わず合流
+    else{
+      // 🔴アコーディオン型：細く→広がる(分岐)→しばらく保つ(7階ルール)→細くなる(合流)、をくり返す。
+      //   細い所で分岐が来るので、プレイヤーが実際に「選ぶ」場面が多くなる。
+      const newTarget=()=> Math.random()<0.65 ? rand(3,4) : MAX_LANE;         // 細めの周期を多くして分岐に出会いやすく
+      if(!b.phase){ b.phase='grow'; b.targetW=newTarget(); b.holdLeft=0; }
+      if(b.phase==='grow'){
+        if(n<b.targetW) s=rand(0,n-1);                                        // 分岐して広がる
+        else { b.phase='hold'; b.holdLeft=NO_MERGE_SPAN+rand(0,1); }
+      }
+      if(b.phase==='hold'){
+        if(b.holdLeft>0){ b.holdLeft--;
+          if(oldPairs.length && n>=3 && Math.random()<0.7){                   // 保っている間も古い所でだけ分岐+合流
+            const mm=pick(oldPairs); const cand=[]; for(let i=0;i<n;i++) if(i!==mm&&i!==mm+1) cand.push(i);
+            if(cand.length){ m=mm; s=pick(cand); }
+          }
+        } else b.phase='shrink';
+      }
+      if(b.phase==='shrink' && s<0){
+        if(n>1 && oldPairs.length) m=pick(oldPairs);                          // 7階たったレーンだけ合流
+        else if(n<=1){ b.phase='grow'; b.targetW=newTarget(); }               // 細くなったら、また分岐して広がる
+      }
+    }
+    // レーンを組み立てる（親→子の対応も同時に作る）
+    const newLanes=[], childOf={};
+    if(isGoalFloor){ newLanes.push({forkFloor:nf}); cur.forEach((l,i)=>childOf[i]=[0]); }
+    else{
+      let i=0;
+      while(i<n){
+        if(i===m && i+1<n){ const idx=newLanes.length;
+          newLanes.push({forkFloor:Math.min(cur[i].forkFloor,cur[i+1].forkFloor)});
+          childOf[i]=[idx]; childOf[i+1]=[idx]; i+=2; }
+        else if(i===s){ const a=newLanes.length; newLanes.push({forkFloor:cur[i].forkFloor});
+          const c=newLanes.length; newLanes.push({forkFloor:nf});             // 新しく分かれたレーン
+          childOf[i]=[a,c]; i++; }
+        else { const idx=newLanes.length; newLanes.push({forkFloor:cur[i].forkFloor}); childOf[i]=[idx]; i++; }
+      }
+    }
+    // ノード生成
+    const width=newLanes.length, arr=[];
+    for(let l=0;l<width;l++){
+      const type = isGoalFloor ? 'goal' : rollType();
+      const node=makeNode(b._idc++, nf, width, l, type, totalForHp);
+      b.nodes[node.id]=node; arr.push(node.id); newLanes[l].id=node.id;
+    }
+    b.floors.push(arr);
+    // リンクを張る
+    cur.forEach((l,i)=>{ const parent=b.nodes[l.id]; parent.next=(childOf[i]||[0]).map(ci=>arr[ci]); });
+    b.lanes=newLanes;
   }
+}
+function genBoard(numFloors,opts={}){
+  const hasGoal=opts.hasGoal!==false;
+  const b={nodes:{},floors:[],numFloors,hasGoal,_idc:0,lanes:[]};
+  const start=makeNode(b._idc++,0,1,0,'start',numFloors);
+  b.nodes[start.id]=start; b.floors.push([start.id]); b.lanes=[{id:start.id,forkFloor:0}];
+  extendFloors(b, numFloors, numFloors, hasGoal);
+  ensureBattleEscape(b); if(hasGoal) ensureSafeRoute(b);
+  return b;
 }
 // 敵ゼロの逃げ道を保証（分岐のキモ）
+// 🔴リンクは足さない（足すと合流が増えて「分岐したら7階は合流しない」が壊れる）。マスの種類だけ変える。
 function ensureBattleEscape(b){
+  // 各階に敵でないマスを必ず1つ残す
   b.floors.forEach(fl=>{ if(fl.length && fl.every(id=>b.nodes[id].type==='battle')){ const n=b.nodes[fl[0]]; n.type='coin'; n.enemyHP=0; } });
-  for(const id in b.nodes){ const n=b.nodes[id]; if(!n.next.length) continue;
-    if(n.next.every(x=>b.nodes[x].type==='battle')){ const up=(b.floors[n.floor+1]||[]).filter(x=>b.nodes[x].type!=='battle');
-      if(up.length){ const p=laneFrac(n.lane,n.laneCount); up.sort((a,c)=>Math.abs(laneFrac(b.nodes[a].lane,b.nodes[a].laneCount)-p)-Math.abs(laneFrac(b.nodes[c].lane,b.nodes[c].laneCount)-p)); n.next.push(up[0]); } }
+  const rev={}; for(const id in b.nodes) rev[id]=[];
+  for(const id in b.nodes) b.nodes[id].next.forEach(x=>rev[x].push(id));
+  for(const id in b.nodes){ const n=b.nodes[id];
+    // 分岐なのに行き先が全部敵＝選ぶ意味がない。1つを敵なしにする
+    if(n.next.length>=2 && n.next.every(x=>b.nodes[x].type==='battle')){
+      const t=b.nodes[pick(n.next)]; t.type='coin'; t.enemyHP=0;
+    }
+  }
+  // 🔴避けて通れない敵（そこにしか進めない一本道の先）にドラゴン級は置かない＝勝てず往復し続けるのを防ぐ
+  for(const id in b.nodes){ const n=b.nodes[id];
+    if(n.type!=='battle' || !rev[id].length) continue;
+    const unavoidable = rev[id].every(pid=>b.nodes[pid].next.length===1);
+    if(unavoidable && n.enemyHP>6) n.enemyHP=6;
   }
 }
 function ensureSafeRoute(b){
@@ -835,10 +894,9 @@ async function warpTile(p,node){
 
 // ============ ソロ無限：継ぎ足し ============
 function maybeExtendSolo(p){
-  const b=G.board,top=b.numFloors; if(b.nodes[p.node].floor<top-10) return; const add=16; let w=(b.floors[top]||[]).length||2;
-  for(let f=top+1;f<=top+add;f++){ if(Math.random()<0.16)w+=pick([-1,1]); w=clamp(w,1,5); const arr=[];
-    for(let l=0;l<w;l++){ const n=makeNode(b._idc++,f,w,l,rollType(),top+add); b.nodes[n.id]=n; arr.push(n.id); } b.floors.push(arr); }
-  b.numFloors=top+add; linkFloors(b.nodes,b.floors,Math.max(0,top-1)); ensureBattleEscape(b); render(); autoScroll(p);
+  const b=G.board,top=b.numFloors; if(b.nodes[p.node].floor<top-10) return; const add=16;
+  extendFloors(b, top+add, top+add, false);      // 分岐/合流のルールは本編と同じ
+  b.numFloors=top+add; ensureBattleEscape(b); render(); autoScroll(p);
 }
 
 // ============ 手札UI ============
