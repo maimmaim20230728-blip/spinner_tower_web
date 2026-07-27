@@ -370,7 +370,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='1.4.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='1.5.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 const FLOOR_H=96, NODE=46, PAD_B=18, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
@@ -731,12 +731,13 @@ function aiEndgamePrep(p){
     // かしこいAIは大きく遅れたら上向きワープカードを惜しまず切る
     const behind=G.players.some(o=>o!==p && !o.finished && G.board.nodes[o.node].floor > G.board.nodes[p.node].floor+8);
     if(behind){ const wi=p.cards.findIndex(k=>CARDS[k].warp==='up1'||CARDS[k].warp==='up2');
-      if(wi>=0){ const key=p.cards[wi]; removeCard(p,wi); useWarpCard(p,CARDS[key].warp); return; } }
+      if(wi>=0){ const key=p.cards[wi]; removeCard(p,wi); p.turn.usedActive=true; useWarpCard(p,CARDS[key].warp); return; } }
   }
   if(D<=0||D>14) return;
+  if(p.turn.usedActive) return;                   // アクティブは1つの番に1枚だけ
   if(!high && Math.random()<0.4) return;          // normalは終盤準備を忘れがち
-  const si=p.cards.findIndex(k=>CARDS[k].stop===D); if(si>=0){ p.turn.stop=D; removeCard(p,si); return; }
-  const fi=p.cards.findIndex(k=>CARDS[k].free); if(fi>=0){ p.turn.free=true; removeCard(p,fi); } }
+  const si=p.cards.findIndex(k=>CARDS[k].stop===D); if(si>=0){ p.turn.stop=D; p.turn.usedActive=true; removeCard(p,si); return; }
+  const fi=p.cards.findIndex(k=>CARDS[k].free); if(fi>=0){ p.turn.free=true; p.turn.usedActive=true; removeCard(p,fi); } }
 function chooseDistance(p,max){ return new Promise(res=>{ const ov=document.createElement('div'); ov.className='overlay';
   let b=''; for(let i=1;i<=max;i++) b+=`<button class="dbtn" data-d="${i}">${i}</button>`;
   ov.innerHTML=`<div class="sheet"><h2>${T('freeChoose')}</h2><div class="dgrid">${b}</div><p class="tiny">${T('freeHint')}</p></div>`;
@@ -854,6 +855,9 @@ function takeFrom(win,lose){
 // ============ カードの使用（回す前） ============
 async function useCard(p,i){
   const k=p.cards[i], c=CARDS[k]; if(!c||c.kind!=='active') return;
+  // 🔴アクティブは重ね掛けできない＝1つの番に1枚だけ（パッシブは持っている分だけ重なる）
+  if(p.turn&&p.turn.usedActive){ msg(T('oneActivePerTurn')); return; }
+  if(p.turn) p.turn.usedActive=true;
   if(c.stop!=null){ p.turn.stop=c.stop; removeCard(p,i); msg(T('useStop',{card:cardName(k),n:c.stop})); }
   else if(c.free){ p.turn.free=true; removeCard(p,i); msg(T('useFree')); }
   else if(c.freemove){ p.turn.freemove=true; if(c.rouletteLimit)p.turn.rouletteLimit=c.rouletteLimit; removeCard(p,i); msg(T('useFreemove')); }
@@ -941,7 +945,7 @@ function handGroups(p){ const g=[], map={};
   return g; }
 function renderHand(){
   const wrap=$('#hand'), me=G.players[0]; if(!me){ wrap.innerHTML=''; return; }
-  const canUse=G.running&&G.wait&&G.wait.type==='spin';
+  const canUse=G.running&&G.wait&&G.wait.type==='spin'&&!(me.turn&&me.turn.usedActive);   // 1番に1枚だけ
   let h=handGroups(me).map(g=>{ const c=CARDS[g.key], num=g.n>1?`<span class="cnum">×${g.n}</span>`:'';
     if(c.kind==='passive') return `<div class="cchip r${c.r} passive" data-i="${g.i}">${cardName(g.key)}${num}<span class="perm">${T('permanent')}</span></div>`;
     return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${g.i}">${cardName(g.key)}${num}</div>`; }).join('');
@@ -952,7 +956,7 @@ function renderHand(){
 function cardInfo(p, i){
   const k=p.cards[i], c=CARDS[k]; if(!c) return;
   const kindLabel = c.kind==='passive' ? T('cardKindPassive') : T('cardKindActive');
-  const usableNow = G.running && G.wait && G.wait.type==='spin' && c.kind==='active';
+  const usableNow = G.running && G.wait && G.wait.type==='spin' && c.kind==='active' && !(p.turn&&p.turn.usedActive);
   const ov=document.createElement('div'); ov.className='overlay';
   const num=cardCount(p,k);
   ov.innerHTML=`<div class="sheet">
@@ -973,6 +977,7 @@ async function takeTurn(p){
   p.turn={}; banner(T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name}),p.color); autoScroll(p); renderHand(); await sleep(300);
   if(p.isAI) aiEndgamePrep(p);
   const {val}=await doSpin(p,{label:T('moveLbl')});
+  p.turn.stop=null; p.turn.rouletteLimit=null;   // ストップ/出目制限は「移動のルーレット」だけに効く（この後のバトルは通常どおり）
   const r=await movePlayer(p,val,p.turn);
   if(r==='retire'){ endGame('retire',p); return; }
   await resolveLanding(p);
