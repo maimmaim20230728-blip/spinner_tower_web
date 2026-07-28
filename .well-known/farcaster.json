@@ -1,4 +1,9 @@
 {
+  "accountAssociation": {
+    "header": "eyJmaWQiOjMzMzkzMTUsInR5cGUiOiJjdXN0b2R5Iiwia2V5IjoiMHg2RGYyOTIyRjc4OUVmMTFmNjk3NDREMEZkYWZCNDhmN2VhNjRmYTExIn0",
+    "payload": "",
+    "signature": ""
+  },
   "miniapp": {
     "version": "1",
     "name": "スゴロクタワー / Spinner Tower",
@@ -11,6 +16,12 @@
     "subtitle": "ルーレットで塔をのぼる縦型すごろく",
     "description": "ルーレットを回して塔をのぼる縦型分岐すごろく。分かれ道を選び、カードを集めて、頂上の宝箱にぴったり止まった人が勝ち。完全無料・広告なし・登録不要・オフラインOK。",
     "primaryCategory": "games",
-    "tags": ["game", "boardgame", "casual", "tower", "soyogi"]
+    "tags": [
+      "game",
+      "boardgame",
+      "casual",
+      "tower",
+      "soyogi"
+    ]
   }
 }
