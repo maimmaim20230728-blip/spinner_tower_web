@@ -120,6 +120,10 @@
   .cchip .perm{font-size:8px; background:#888; color:#fff; border-radius:5px; padding:0 3px; margin-left:2px;}
   .cchip .cnum{font-size:11px; font-weight:900; margin-left:3px; padding:0 4px; border-radius:6px;
     background:rgba(0,0,0,.10); color:inherit;}
+  /* ショップでカードをタップすると説明が出る（押せることが分かるように） */
+  .cchip.tapinfo{cursor:pointer; box-shadow:0 2px 0 rgba(0,0,0,.12);}
+  .cchip.tapinfo::after{content:'👆'; font-size:9px; margin-left:3px; opacity:.75;}
+  .cchip.tapinfo:active{transform:translateY(1px);}
 
   /* 🔴 z-index: タイトル画面(24)より必ず手前に出す。でないとパネルが裏に隠れて「押しても反応しない」ように見える */
   .overlay{position:absolute; inset:0; background:rgba(15,28,23,.55); display:flex; align-items:center;
@@ -383,7 +387,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.0.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.1.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
@@ -1024,24 +1028,57 @@ async function useWarpCard(p,mode){
 }
 
 // ============ ショップ（ランダム5枚販売＋買取＋換金1💎=5🪙） ============
-function cardChip(k){ const c=CARDS[k]; return `<span class="cchip r${c.r}">${cardName(k)}</span>`; }
+function cardChip(k){ const c=CARDS[k]; return `<span class="cchip r${c.r} tapinfo" data-info="${k}">${cardName(k)}</span>`; }
+// 🔴カードの説明ポップアップ（ショップでも手札でも共通・買う前/売る前に中身を読める）
+function cardPopup(k, extra){
+  const c=CARDS[k];
+  const kindLabel = c.kind==='passive' ? T('cardKindPassive') : T('cardKindActive');
+  const ov=document.createElement('div'); ov.className='overlay'; ov.style.zIndex=28;
+  ov.innerHTML=`<div class="sheet">
+    <div class="cchip r${c.r}" style="display:inline-flex;font-size:15px;margin-bottom:8px">${cardName(k)}</div>
+    <p class="tiny" style="font-weight:800;color:var(--ink);margin:2px 0">${kindLabel}</p>
+    <p>${cardDesc(k)}</p>
+    ${extra&&extra.note?`<p class="tiny">${extra.note}</p>`:''}
+    ${extra&&extra.action?`<button class="btn" id="cp-act" ${extra.disabled?'disabled':''}>${extra.actionLabel}</button>`:''}
+    <button class="btn sub" id="cp-close">${T('close')}</button></div>`;
+  $('#app').appendChild(ov);
+  const act=ov.querySelector('#cp-act');
+  if(act && !extra.disabled) act.onclick=()=>{ ov.remove(); extra.action(); };
+  ov.querySelector('#cp-close').onclick=()=>ov.remove();
+}
 function openShop(p,opt){ return new Promise(resolve=>{
   const forSale=[]; for(let i=0;i<(opt.cards||0);i++) forSale.push(randomCardKey()); const mult=opt.sellMult||1;
   const ov=document.createElement('div'); ov.className='overlay';
+  const costOf=k=>RARITY[CARDS[k].r].cost, sellOf=k=>RARITY[CARDS[k].r].sell;
+  const canPay=k=>{ const c=costOf(k); return p.coins>=c.c && p.diamonds>=(c.d||0); };
+  const doBuy=i=>{ const k=forSale[i]; if(k==null||!canPay(k)||!canAddCard(p,k)) return;
+    const c=costOf(k); p.coins-=c.c; p.diamonds-=(c.d||0); addCard(p,k); forSale[i]=null; AU('sfx','card'); updateHUD(); draw(); };
+  const doSell=i=>{ const k=p.cards[i]; if(!k) return; const s=sellOf(k);
+    p.coins+=s.c*mult; p.diamonds+=(s.d||0)*mult; removeCard(p,i); AU('sfx','coin'); updateHUD(); draw(); };
   const draw=()=>{ let h=`<div class="sheet shopsheet"><h2>🛒 ${opt.cards?T('shopTitle'):(mult>1?T('shopBuyback3'):T('shopExchangeT'))}</h2>
-    <p class="tiny">${T('shopOwn',{c:p.coins,d:p.diamonds})}</p>`;
+    <p class="tiny">${T('shopOwn',{c:p.coins,d:p.diamonds})}</p>
+    <p class="tiny" style="color:var(--accent-d);font-weight:800">👆 ${T('tapForInfo')}</p>`;
     if(opt.cards){ h+=`<div class="lbl2">${T('shopStock')}</div>`;
-      forSale.forEach((k,i)=>{ if(k==null)return; const cost=RARITY[CARDS[k].r].cost, ok=p.coins>=cost.c&&p.diamonds>=(cost.d||0);
+      forSale.forEach((k,i)=>{ if(k==null)return; const cost=costOf(k), ok=canPay(k)&&canAddCard(p,k);
         h+=`<div class="shopItem">${cardChip(k)}<span class="cst">${cost.d?'💎'+cost.d+' ':''}🪙${cost.c}</span><button class="buy" data-b="${i}" ${ok?'':'disabled'}>${T('buy')}</button></div>`; }); }
     if(opt.buyback){ h+=`<div class="lbl2">${T('shopSellLbl')}${mult>1?T('shopSell3x'):''}</div>`; if(!p.cards.length) h+=`<div class="tiny">${T('shopNoCards')}</div>`;
-      handGroups(p).forEach(g=>{ const s=RARITY[CARDS[g.key].r].sell;
+      handGroups(p).forEach(g=>{ const s=sellOf(g.key);
         h+=`<div class="shopItem">${cardChip(g.key)}${g.n>1?`<span class="cnum">×${g.n}</span>`:''}<span class="cst">+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}</span><button class="sell" data-s="${g.i}">${T('sell')}</button></div>`; }); }
     if(opt.exchange){ h+=`<div class="lbl2">${T('exchangeLbl')}</div><div class="exrow"><button class="ex" data-x="d2c" ${p.diamonds<1?'disabled':''}>💎1 → 🪙5</button><button class="ex" data-x="c2d" ${p.coins<5?'disabled':''}>🪙5 → 💎1</button></div>`; }
     h+=`<button class="btn sub" id="sc">${T('shopLeave')}</button></div>`; ov.innerHTML=h;
-    ov.querySelectorAll('.buy').forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.b,k=forSale[i]; if(k==null)return; const cost=RARITY[CARDS[k].r].cost;
-      if(p.coins<cost.c||p.diamonds<(cost.d||0))return; p.coins-=cost.c; p.diamonds-=(cost.d||0); addCard(p,k); forSale[i]=null; updateHUD(); draw(); });
-    ov.querySelectorAll('.sell').forEach(btn=>btn.onclick=()=>{ const i=+btn.dataset.s,s=RARITY[CARDS[p.cards[i]].r].sell; p.coins+=s.c*mult; p.diamonds+=(s.d||0)*mult; removeCard(p,i); updateHUD(); draw(); });
-    ov.querySelectorAll('.ex').forEach(btn=>btn.onclick=()=>{ if(btn.dataset.x==='d2c'&&p.diamonds>=1){p.diamonds--;p.coins+=5;} else if(btn.dataset.x==='c2d'&&p.coins>=5){p.coins-=5;p.diamonds++;} updateHUD(); draw(); });
+    ov.querySelectorAll('.buy').forEach(btn=>btn.onclick=()=>doBuy(+btn.dataset.b));
+    ov.querySelectorAll('.sell').forEach(btn=>btn.onclick=()=>doSell(+btn.dataset.s));
+    ov.querySelectorAll('.ex').forEach(btn=>btn.onclick=()=>{ if(btn.dataset.x==='d2c'&&p.diamonds>=1){p.diamonds--;p.coins+=5;} else if(btn.dataset.x==='c2d'&&p.coins>=5){p.coins-=5;p.diamonds++;} AU('sfx','coin'); updateHUD(); draw(); });
+    // 🔴カードをタップ＝説明を見る。そのまま「買う／売る」もできる
+    ov.querySelectorAll('.tapinfo').forEach(el=>{ const row=el.closest('.shopItem'); if(!row) return;
+      const buyBtn=row.querySelector('.buy'), sellBtn=row.querySelector('.sell');
+      el.onclick=()=>{ const k=el.dataset.info;
+        if(buyBtn){ const c=costOf(k), full=!canAddCard(p,k);
+          cardPopup(k,{ actionLabel:`${T('buy')}（${c.d?'💎'+c.d+' ':''}🪙${c.c}）`, disabled:buyBtn.disabled,
+            note: full? T('cantHold') : '', action:()=>doBuy(+buyBtn.dataset.b) }); }
+        else if(sellBtn){ const s=sellOf(k);
+          cardPopup(k,{ actionLabel:`${T('sell')}（+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}）`, action:()=>doSell(+sellBtn.dataset.s) }); }
+        else cardPopup(k,{}); }; });
     ov.querySelector('#sc').onclick=()=>{ ov.remove(); resolve(); }; };
   draw(); $('#app').appendChild(ov); if(p.isAI) setTimeout(()=>{ ov.remove(); resolve(); },400);
 }); }
