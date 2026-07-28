@@ -34,8 +34,11 @@
   html,body{margin:0;height:100%;}
   body{font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
     color:var(--ink); background:#0f1c17; overscroll-behavior:none; display:flex; justify-content:center;}
+  /* 🔴画面の上下は縁ぴったりにしない（端が見えにくい・押しにくい機種があるため5〜10pxの余白） */
   #app{width:100%; max-width:480px; height:100dvh; height:100vh; background:var(--paper);
-    position:relative; overflow:hidden; display:flex; flex-direction:column;}
+    position:relative; overflow:hidden; display:flex; flex-direction:column;
+    padding-top:max(8px, env(safe-area-inset-top));
+    padding-bottom:max(8px, env(safe-area-inset-bottom));}
 
   #hud{flex:0 0 auto; padding:8px 10px; background:var(--card); border-bottom:1px solid var(--line);
     display:flex; align-items:center; gap:8px;}
@@ -387,7 +390,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.1.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.2.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
@@ -726,9 +729,10 @@ function groundSvg(W,H,gy,cx,baseHW,st){
   const gr=H-20;                                   // 草の地面ライン（スタートのマスが立つ高さ）
   const sTop=H-(PAD_B+NODE)-2;                      // スタートのマスの上端＝石段はここから始める
   const rise=sTop-gy, n=4, sh=rise/n;               // 石段は4段で塔の土台まで登る
+  const wBase=Math.min(baseHW*1.05, W*0.30);        // 🔴石段は塔より細く（幅いっぱいだと柵に見える）
   let steps='';
   for(let i=0;i<n;i++){
-    const w=(baseHW+30-i*7)*2, y=sTop-sh*(i+1);
+    const w=(wBase-i*10)*2, y=sTop-sh*(i+1);
     steps+=`<rect x="${(cx-w/2).toFixed(1)}" y="${y.toFixed(1)}" width="${w.toFixed(1)}" height="${(sh+1).toFixed(1)}" rx="3" fill="${st.cap}" stroke="${st.mortar}" stroke-width="2"/>`;
   }
   return `
@@ -739,11 +743,11 @@ function groundSvg(W,H,gy,cx,baseHW,st){
     <path d="M${W*0.08},${gr-1} l3,-12 l3,12 z"/><path d="M${W*0.88},${gr-2} l3,-11 l3,11 z"/>
     <path d="M${W*0.20},${gr-2} l3,-9 l3,9 z"/><path d="M${W*0.78},${gr-1} l3,-10 l3,10 z"/>
   </g>
-  <path d="M${cx-baseHW-36},${gr} L${cx-baseHW-10},${gy+8} L${cx+baseHW+10},${gy+8} L${cx+baseHW+36},${gr} Z" fill="${soil}"/>
+  <path d="M${cx-baseHW-22},${gr} L${cx-baseHW-3},${gy+6} L${cx+baseHW+3},${gy+6} L${cx+baseHW+22},${gr} Z" fill="${soil}"/>
   ${steps}`;
 }
 function basePlinth(cx,baseHW,gy,st){
-  return `<rect x="${cx-baseHW-9}" y="${gy-4}" width="${(baseHW+9)*2}" height="15" rx="4" fill="${st.cap}" stroke="${st.mortar}" stroke-width="3"/>`;
+  return `<rect x="${cx-baseHW-4}" y="${gy-3}" width="${(baseHW+4)*2}" height="11" rx="3" fill="${st.cap}" stroke="${st.mortar}" stroke-width="2"/>`;
 }
 function drawLinks(){
   const b=G.board,H=boardHeight(),s=$('#links');
