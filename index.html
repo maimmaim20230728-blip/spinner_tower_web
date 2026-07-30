@@ -256,7 +256,8 @@
   .modebtn.alt:active{box-shadow:0 2px 0 var(--blue-d);}
   .modebtn.solo{background:#8b5cf6; box-shadow:0 4px 0 #6d43d8;}
   .modebtn.solo:active{box-shadow:0 2px 0 #6d43d8;}
-  #titleScreen .tfoot{padding:12px 16px 18px; text-align:center;}
+  /* 🔴クレジットが下端に隠れる機種があるため、2行分(約40px)上げる+セーフエリア加算(2026-07-31ヒロ指摘) */
+  #titleScreen .tfoot{padding:12px 16px calc(58px + env(safe-area-inset-bottom)); text-align:center;}
   #titleScreen .credit{font-size:12px; color:var(--sub); font-weight:700; text-decoration:none; display:inline-block; padding:8px;}
   #titleScreen .credit u{text-decoration:underline;}
   #soloBest{font-size:13px; font-weight:800; color:var(--accent-d); min-height:18px; margin-top:6px; text-align:center;}
@@ -448,7 +449,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.5.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.5.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
