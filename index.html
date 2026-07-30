@@ -167,12 +167,41 @@
   .celebrate{position:absolute; inset:0; z-index:30; pointer-events:none; overflow:hidden;}
   .celebrate .flash{position:absolute; inset:0; background:#fff; animation:flash .5s ease-out forwards;}
   @keyframes flash{0%{opacity:.85;}100%{opacity:0;}}
-  .celebrate span{position:absolute; top:-8%; font-size:26px; animation:confetti linear forwards;}
+  .celebrate span{position:absolute; top:-8%; font-size:26px; animation:confetti linear both;}
   @keyframes confetti{0%{transform:translateY(-10%) rotate(0);}100%{transform:translateY(115vh) rotate(560deg);}}
   .celebrate .clearword{position:absolute; top:36%; left:0; right:0; text-align:center; font-size:42px; font-weight:900;
     color:#f6c945; -webkit-text-stroke:2px #7a5600; text-shadow:0 4px 12px rgba(0,0,0,.4);
-    animation:pop .6s cubic-bezier(.2,1.4,.4,1) forwards;}
+    animation:pop .6s cubic-bezier(.2,1.4,.4,1) both;}
   @keyframes pop{0%{transform:scale(.2);opacity:0;}60%{transform:scale(1.15);opacity:1;}100%{transform:scale(1);}}
+  /* 回転する金の光背（クリアの文字の後ろ） */
+  .celebrate .ray{position:absolute; left:50%; top:42%; width:640px; height:640px; margin:-320px 0 0 -320px;
+    background:repeating-conic-gradient(rgba(255,214,74,.5) 0 12deg, rgba(255,214,74,0) 12deg 30deg);
+    border-radius:50%; animation:rayspin 5s linear infinite; opacity:.8;
+    -webkit-mask:radial-gradient(circle, #000 0 38%, transparent 66%);
+    mask:radial-gradient(circle, #000 0 38%, transparent 66%);}
+  @keyframes rayspin{to{transform:rotate(360deg);}}
+  /* 打ち上げ花火（放射状に飛び散る粒） */
+  .celebrate .fw{position:absolute; width:0; height:0;}
+  .celebrate .fw i{position:absolute; left:0; top:0; width:7px; height:7px; border-radius:50%;
+    animation:fwp .9s ease-out both; box-shadow:0 0 6px currentColor;}
+  @keyframes fwp{0%{transform:translate(0,0) scale(1);opacity:1;}70%{opacity:1;}
+    100%{transform:translate(var(--dx),var(--dy)) scale(.35);opacity:0;}}
+  /* 画面ゆれ */
+  @keyframes clearshake{0%,100%{transform:translate(0,0);}20%{transform:translate(-7px,5px);}
+    40%{transform:translate(6px,-5px);}60%{transform:translate(-4px,3px);}80%{transform:translate(3px,-2px);}}
+  /* 最終面（全塔制覇）のど派手要素：虹色に流れる文字＋せり上がるトロフィー */
+  .celebrate .clearword.rainbow{-webkit-text-stroke:0; color:transparent;
+    background:linear-gradient(90deg,#ff5757,#ffb443,#ffe14d,#5bde7c,#4dc5ff,#b18cff,#ff5757);
+    background-size:200% 100%; -webkit-background-clip:text; background-clip:text;
+    filter:drop-shadow(0 3px 8px rgba(0,0,0,.45));
+    animation:pop .6s cubic-bezier(.2,1.4,.4,1) both, rainbowshift 2.2s linear infinite;}
+  @keyframes rainbowshift{to{background-position:200% 0;}}
+  .celebrate .trophy{position:absolute; left:0; right:0; top:26%; text-align:center; font-size:100px;
+    filter:drop-shadow(0 6px 18px rgba(255,200,60,.8));
+    animation:trophyrise 1.1s cubic-bezier(.2,1.3,.4,1) both, trophyfloat 2.4s ease-in-out 1.1s infinite;}
+  @keyframes trophyrise{0%{transform:translateY(90px) scale(.3);opacity:0;}
+    60%{transform:translateY(-10px) scale(1.12);opacity:1;}100%{transform:translateY(0) scale(1);}}
+  @keyframes trophyfloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);}}
 
   /* ===== アクセント色をUIクロムへ（テーマで切替わる） ===== */
   #turnbar{background:var(--accent);}
@@ -419,8 +448,9 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.4.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
-// 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
+const APP_VER='2.5.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+// 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
+//   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
 const FLOOR_H=96, NODE=46, PAD_B=16, GROUND=116, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
@@ -995,8 +1025,8 @@ function retreat(p,k){ for(let i=0;i<k&&p.path.length>1;i++) p.path.pop(); p.nod
 //   勝つ／引き分け＝そのマスに残る → そのマスのイベントが起きる。
 //   負ける＝下がる → 下がった先のマスで改めて判定する（そこにも誰かいれば、また対戦になる）。
 //   下がり続ける連鎖が終わらない事態を避けるため、繰り返しは8回で打ち切る。
-//   pvpOnly=true のときは対戦だけ行い、マスのイベントは起こさない（バトルロワイヤルで下がった人に使う）。
-async function resolveLanding(p,depth=0,pvpOnly=false){
+//   ※バトルロワイヤルの敗者の連鎖は evRoyale 内で専用に解決する（マスのイベントを起こさないため）。
+async function resolveLanding(p,depth=0){
   const ctx=p.turn||{};
   const here=p.node;
   const others=G.players.filter(o=>o!==p&&!o.finished&&o.node===here);
@@ -1006,10 +1036,9 @@ async function resolveLanding(p,depth=0,pvpOnly=false){
       if(o.node!==here) continue;   // すでにこのマスから居なくなった人は飛ばす
       await pvpBattle(p,o);
     }
-    if(p.node!==here){ await resolveLanding(p,depth+1,pvpOnly); return; }   // 負けて下がった＝下がった先で判定し直す
+    if(p.node!==here){ await resolveLanding(p,depth+1); return; }   // 負けて下がった＝下がった先で判定し直す
     // 残った＝このマスのイベントへ進む
   }
-  if(pvpOnly){ render(); return; }
   const n=G.board.nodes[p.node];
   switch(n.type){
     case 'coin':{ const c=rand(2,5); p.coins+=c; AU('sfx','coin'); msg(T('coinGet',{name:p.name,n:c})); break; }
@@ -1298,14 +1327,32 @@ async function evRoyale(p){
   msg(T('evRoyaleResult',{n:max,stay:stay.map(r=>r.o.name).join('、'),back:lost.length}));
   await sleep(700);
   AU('playBGM',fieldBGM());
-  // 🔴同じ差でもどった人は同じマスに集まる＝そこで通常の対戦になる（マスのイベントは起こさない）。
-  //   1マスにつき1回だけ呼ぶ。全員ぶん呼ぶと同じ組み合わせが2回戦ってしまうため。
-  const seen=new Set();
-  for(const r of lost){
-    if(r.o.finished || seen.has(r.o.node)) continue;
-    seen.add(r.o.node);
-    await resolveLanding(r.o,0,true);
+  // 🔴敗者の対戦の連鎖（2026-07-31ヒロ確認で補強）。もどった先に人がいれば通常の対戦になり、
+  //   そこで負けた人も、突き飛ばされた相手も、また下がった先で同じように判定する（連鎖）。
+  //   マスのイベントは起こさない＝対戦だけが最後まで続く。
+  //   同じ2人が同じマスで2回戦わないよう「2人の組＋マス」で対戦済みを覚える
+  //   （引き分けは両者そのマスに残るため、覚えないと同じ組が延々と再戦してしまう）。
+  //   後退は必ず下方向なので連鎖は自然に収束する。保険として40手で打ち切り。
+  const fought=new Set(), queue=lost.map(r=>r.o);
+  let guard=0;
+  while(queue.length && guard++<40){
+    const o=queue.shift();
+    if(o.finished) continue;
+    const at=o.node;
+    if(at===here) continue;                     // 勝者が残る「？」マスに居る人は対象外（保険）
+    const rivals=G.players.filter(x=>x!==o&&!x.finished&&x.node===at);
+    for(const r2 of rivals){
+      if(o.node!==at) break;                    // 自分が負けて下がった＝このマスは打ち切り
+      if(r2.node!==at) continue;                // 先に居なくなった人は飛ばす
+      const key=[Math.min(o.id,r2.id),Math.max(o.id,r2.id),at].join('|');
+      if(fought.has(key)) continue;             // この2人はこのマスで対戦済み（引き分けで同席中）
+      fought.add(key);
+      await pvpBattle(o,r2);
+      if(r2.node!==at) queue.push(r2);          // 突き飛ばされた人＝もどった先で改めて判定
+    }
+    if(o.node!==at) queue.push(o);              // 自分が下がった＝もどった先で改めて判定
   }
+  render();
   // 起こした人が残っていれば、このマスのイベントは「ロワイヤル」そのものなのでここで終わり
   return T('evRoyale',{n:all.length-1});
 }
@@ -1442,8 +1489,30 @@ async function takeTurn(p){
   const r=await movePlayer(p,val,p.turn);
   if(r==='retire'){ endGame('retire',p); return; }
   await resolveLanding(p);
-  if(G.mode!=='solo'){ if(G.board.nodes[p.node].type==='goal'){ endGame('win',p); return; } }
+  if(G.mode!=='solo'){
+    if(G.board.nodes[p.node].type==='goal'){
+      // 🔴対戦（キャンペーン）は3位以内でクリア（2026-07-31ヒロ指定）。AIがゴールしても勝負は続く
+      if(G.mode==='campaign'){ if(await reachGoal(p)) return; }
+      else { endGame('win',p); return; }
+    }
+  }
   else if(p.hp<=0){ endGame('retire',p); return; }
+}
+// 🔴対戦（キャンペーン）のゴール処理（2026-07-31ヒロ指定＝1位のみは難しすぎた）。
+//   ゴールした人は finished＝以後は番が飛び、コマも盤面から消える（宝箱に入ったイメージ）。
+//   自分がゴール＝その時点で3位以内が確定しているので即クリア。
+//   AIが3人ゴール＝もう3位に入れないので、その時点で負け。
+async function reachGoal(p){
+  p.finished=true;
+  p.rank=(G.goalCount=(G.goalCount||0)+1);
+  if(!p.isAI){ endGame('win',p); return true; }
+  AU('sfx','goal');
+  banner(T('aiGoal',{name:p.name,n:p.rank}),'var(--coin)');
+  msg(T('aiGoal',{name:p.name,n:p.rank}));
+  render(); await sleep(900);
+  if(p.rank>=3){ endGame('lose',G.me); return true; }
+  msg(T('aiGoalHint'));
+  return false;
 }
 // ============ 最初のじゅんばん決め（ルーレットで・ヒロ指定2026-07-28） ============
 // 全員が1回ずつ回して、大きい数の人から先攻。同じ数なら、その人たちだけで振り直す。
@@ -1490,6 +1559,7 @@ function serializeGame(){
   return {
     v:2, ts:Date.now(), mode:G.mode, stage:G.stage||0,
     style:G.style, board:G.board, turn:G.turn, turnNo:G.turnNo||0,
+    goals:G.goalCount||0,          // 🔴3位以内クリア制：何人ゴール済みか（2026-07-31）
     hidden:G.hidden||[], meIdx:Math.max(0,G.players.indexOf(G.me)),
     friends: G.mode==='friends' ? G.friends : null,
     players: G.players.map(p=>Object.assign({},p,{turn:{}}))   // 番の途中の一時状態は持ち越さない
@@ -1533,6 +1603,7 @@ function renderSaveList(){
 function resumeGame(s){
   G.mode=s.mode; G.stage=s.stage||0; G.style=s.style; G.board=s.board;
   G.players=s.players; G.turn=s.turn||0; G.turnNo=s.turnNo||0; G.hidden=s.hidden||[];
+  G.goalCount=s.goals||0;
   G.players.forEach(p=>{ p.turn=p.turn||{}; });
   G.me=G.players[s.meIdx] || G.players.find(p=>!p.isAI) || G.players[0];
   if(s.friends) G.friends=s.friends;
@@ -1563,11 +1634,32 @@ async function titleCelebration(floor){
   await sleep(2200); c.remove();
 }
 function titleFor(f){ let t=TITLES[0][1]; for(const[x,n]of TITLES){ if(f>=x)t=n; } return T(t); }
-function celebrate(grand){ const c=document.createElement('div'); c.className='celebrate'; const em=['🎉','✨','🎊','⭐','💎','🪙','🏆']; let b='';
-  const n=grand?110:44;
-  for(let i=0;i<n;i++) b+=`<span style="left:${rand(0,100)}%;animation-delay:${rand(0,grand?1800:900)/1000}s;animation-duration:${(140+rand(0,120))/100}s;font-size:${grand?rand(22,40):26}px">${pick(em)}</span>`;
-  const word=grand?`<div class="clearword" style="top:30%;font-size:34px">CONGRATULATIONS!</div><div class="clearword" style="top:42%">${T('allTowers')}</div>`:`<div class="clearword">${T('clearWord')}</div>`;
-  c.innerHTML=`<div class="flash"></div>${b}${word}`; $('#app').appendChild(c); setTimeout(()=>c.remove(), grand?4600:2800); }
+// 打ち上げ花火をひとつ置く（x,y=％位置・delay=ms・big=最終面用の大きい花火）
+function fwBurst(c,x,y,delay,big){
+  const colors=['#ff5757','#ffb443','#ffe14d','#5bde7c','#4dc5ff','#b18cff','#ff8ad4'];
+  const f=document.createElement('div'); f.className='fw'; f.style.left=x+'%'; f.style.top=y+'%';
+  const n=big?18:12, R=big?rand(120,190):rand(70,120);
+  let h='';
+  for(let i=0;i<n;i++){ const a=(i/n)*Math.PI*2+Math.random()*.4, r=R*(0.75+Math.random()*.5);
+    const col=pick(colors);
+    h+=`<i style="background:${col};color:${col};--dx:${Math.round(Math.cos(a)*r)}px;--dy:${Math.round(Math.sin(a)*r)}px;animation-delay:${delay}ms;animation-duration:${big?1100:900}ms"></i>`; }
+  f.innerHTML=h; c.appendChild(f);
+}
+// 🔴クリア演出（2026-07-31ヒロ依頼で強化）。通常＝花火6発＋回転光背＋紙吹雪90＋画面ゆれ。
+//   grand（最終面クリア）＝トロフィー＋虹色文字＋花火14発＋紙吹雪170の長いど派手バージョン。
+function celebrate(grand){ const c=document.createElement('div'); c.className='celebrate'+(grand?' grand':''); const em=['🎉','✨','🎊','⭐','💎','🪙','🏆']; let b='';
+  const n=grand?170:90;
+  for(let i=0;i<n;i++) b+=`<span style="left:${rand(0,100)}%;animation-delay:${rand(0,grand?3600:1400)/1000}s;animation-duration:${(150+rand(0,140))/100}s;font-size:${grand?rand(20,40):rand(20,32)}px">${pick(em)}</span>`;
+  const word=grand
+    ?`<div class="trophy">🏆</div><div class="clearword rainbow" style="top:47%;font-size:34px">CONGRATULATIONS!</div><div class="clearword rainbow" style="top:57%;font-size:40px;animation-delay:.25s">${T('allTowers')}</div>`
+    :`<div class="clearword">${T('clearWord')}</div>`;
+  c.innerHTML=`<div class="flash"></div><div class="ray"${grand?' style="animation-duration:3s;top:36%"':''}></div>${b}${word}`;
+  const shots=grand?14:6;
+  for(let i=0;i<shots;i++) fwBurst(c, rand(8,92), rand(10,64), grand?i*280:i*180, grand);
+  $('#app').appendChild(c);
+  const bs=$('#boardScroll');
+  if(bs){ bs.style.animation=`clearshake ${grand?0.7:0.45}s ease-in-out`; setTimeout(()=>{ bs.style.animation=''; }, grand?750:500); }
+  setTimeout(()=>c.remove(), grand?6400:2900); }
 function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const floor=G.board.nodes[p.node].floor;
   let extra='';
   if(G.mode==='solo'){
@@ -1577,17 +1669,20 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
     if(!best || floor>best.floor) localStorage.setItem('gt_solo_best', JSON.stringify({floor,tiles}));
   }
   // キャンペーン：人間が勝ったらこの段をクリア扱い→次を解放。最終段はド派手コングラ
+  // 🔴kind='lose'＝AIが3人先にゴールして3位に入れなかった（2026-07-31・3位以内クリア制）
   const humanWin = kind==='win' && !p.isAI;
   const grand = humanWin && G.mode==='campaign' && (G.stage||0)===STAGES.length-1;
   if(humanWin && G.mode==='campaign') markCleared(G.stage||0);
+  const rankPart = G.mode==='campaign' && kind==='win' && p.rank ? `${['','🥇','🥈','🥉'][p.rank]||''} ${T('rankClear',{n:p.rank})}<br>` : '';
   const show=()=>{ const ov=document.createElement('div'); ov.className='overlay';
-    const head=kind==='win'?(grand?T('endGrandHead'):T('endWinHead',{name:p.name})):T('endRetireHead');
+    const head=kind==='win'?(grand?T('endGrandHead'):T('endWinHead',{name:p.name})):kind==='lose'?T('endLoseHead'):T('endRetireHead');
     const unlockNote = humanWin && G.mode==='campaign' && !grand && (G.stage||0)+1<STAGES.length ? `<br>${T('unlocked',{s:T('st'+((G.stage||0)+1))})}` : '';
-    const body=(kind==='win'?(grand?T('endGrandBody'):T('endWinBody')):``)+`${extra}${unlockNote}<br>${T('titleName',{t:titleFor(floor)})}`;
+    const body=rankPart+(kind==='win'?(grand?T('endGrandBody'):T('endWinBody')):kind==='lose'?T('endLoseBody'):``)+`${extra}${unlockNote}<br>${T('titleName',{t:titleFor(floor)})}`;
     ov.innerHTML=`<div class="sheet"><h1 style="font-size:20px">${head}</h1><p>${body}</p><button class="btn" id="again">${T('again')}</button><button class="btn sub" id="tt">${T('toTitle')}</button></div>`;
     $('#app').appendChild(ov); ov.querySelector('#again').onclick=()=>{ ov.remove(); AU('sfx','button'); startGame(); };
     ov.querySelector('#tt').onclick=()=>{ ov.remove(); AU('sfx','button'); showTitle(); }; };
-  if(kind==='win'){ banner(grand?'CONGRATULATIONS!':T('clearWord'),'var(--coin)'); AU('sfx','goal'); celebrate(grand); setTimeout(show, grand?2600:1500); }
+  if(kind==='win'){ banner(grand?'CONGRATULATIONS!':T('clearWord'),'var(--coin)'); AU('sfx',grand?'fanfare':'goal'); celebrate(grand); setTimeout(show, grand?5200:1700); }
+  else if(kind==='lose'){ banner(T('endLoseHead'),'var(--sub)'); AU('sfx','lose'); show(); }
   else { banner(T('endRetireHead'),'var(--sub)'); AU('sfx','lose'); show(); }
 }
 
@@ -1664,7 +1759,7 @@ function startGame(){
   else if(G.mode==='friends'){ numFloors=G.friends.height||45; }
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
-  G.turnNo=0; G.hidden=[];                            // 隠れた敵の管理をリセット
+  G.turnNo=0; G.hidden=[]; G.goalCount=0;             // 隠れた敵・ゴール人数をリセット
   G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
   AU('playBGM', (G.style&&G.style.bgm)||G.mode);      // 🔴BGMは塔の種類ごと
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});

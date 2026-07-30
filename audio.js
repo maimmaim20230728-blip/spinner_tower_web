@@ -502,6 +502,18 @@
     // UIボタン：短いカチッ
     button: function (t) {
       tone(t, 880, 0.05, 'triangle', 0.3);
+    },
+    // 全塔制覇のど派手ファンファーレ（最終面クリア用・約3秒）
+    fanfare: function (t) {
+      // 力強い呼び出し：ド・ド・ド・ミ・ソ・高ド
+      var call = [[523, 0], [523, 0.14], [523, 0.28], [659, 0.42], [784, 0.60], [1047, 0.82]];
+      for (var i = 0; i < call.length; i++) tone(t + call[i][1], call[i][0], 0.22, 'square', 0.26);
+      // 締めの大和音（長く鳴らす）＋上できらめき
+      var end = t + 1.1;
+      [523, 659, 784, 1047, 1319].forEach(function (f, i) { tone(end + i * 0.03, f, 1.5, 'triangle', 0.16); });
+      [1568, 2093].forEach(function (f, i) { tone(end + 0.5 + i * 0.14, f, 0.9, 'triangle', 0.14); });
+      noise(end, 0.5, 0.22, 4500, true);
+      noise(end + 0.9, 0.4, 0.14, 5200, true);
     }
   };
 
