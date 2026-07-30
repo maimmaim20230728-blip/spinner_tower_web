@@ -91,9 +91,16 @@
     display:flex; align-items:center; justify-content:center; border:2px solid #fff; z-index:2;}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.28), 0 3px 8px rgba(20,60,35,.3);}
     50%{box-shadow:0 0 0 11px rgba(34,197,94,0), 0 3px 8px rgba(20,60,35,.3);}}
-  .tok{position:absolute; width:22px; height:22px; margin-left:-11px; border-radius:50%; border:2px solid #fff;
+  /* コマ。人数が多いと見分けづらいので一回り大きくした（2026-07-30ヒロ指摘） */
+  .tok{position:absolute; width:28px; height:28px; margin-left:-14px; border-radius:50%; border:2px solid #fff;
     box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:6; display:flex; align-items:center; justify-content:center;
-    color:#fff; font-size:11px; font-weight:800; transition:left .18s, bottom .18s;}
+    color:#fff; font-size:13px; font-weight:800; transition:left .18s, bottom .18s;}
+  /* 目立たせるコマ（ひとりで遊ぶ時は自分・みんなでの時は今の番の人だけ）＝さらに一回り大きく、ゆっくり点滅 */
+  .tok.mine{width:36px; height:36px; margin-left:-18px; font-size:15px; z-index:8; border-width:3px;
+    animation:tokBlink 1.6s ease-in-out infinite;}
+  @keyframes tokBlink{0%,100%{opacity:1; box-shadow:0 0 0 0 rgba(255,255,255,.9), 0 2px 6px rgba(0,0,0,.4);}
+    50%{opacity:.55; box-shadow:0 0 0 7px rgba(255,255,255,0), 0 2px 6px rgba(0,0,0,.4);}}
+  @media (prefers-reduced-motion:reduce){ .tok.mine{animation:none;} }
 
   #ctrl{flex:0 0 auto; background:var(--card); border-top:1px solid var(--line); padding:8px 10px 10px;}
   #msg{min-height:34px; font-size:13px; color:var(--sub); font-weight:700; text-align:center; margin-bottom:6px;
@@ -274,9 +281,13 @@
   #enemyShow .ebox{background:var(--card); border-radius:18px; padding:18px 26px; text-align:center;
     animation:pop .45s cubic-bezier(.2,1.4,.4,1); transition:padding .3s ease;}
   #enemyShow svg{width:96px; height:96px; image-rendering:pixelated;}
+  /* 🔴強敵(HP5以上=64×64のドット絵)は大きく見せる。弱い敵と同じ大きさでは迫力が出ない（2026-07-30ヒロ指摘） */
+  #enemyShow.big svg{width:150px; height:150px;}
+  #enemyShow.boss svg{width:184px; height:184px;}
   /* 🔴登場演出のあとは上に寄せて、戦闘が終わるまで大きいまま出しっぱなしにする（ヒロ依頼2026-07-30）。
      操作は下のルーレット側なので、上に寄せておけばぶつからない。 */
-  #enemyShow.docked{background:transparent; align-items:flex-start; padding-top:6px;}
+  /* 上端だと高すぎたので、中央よりすこし上に置く（2026-07-30ヒロ指摘） */
+  #enemyShow.docked{background:transparent; align-items:center; padding-bottom:26%;}
   #enemyShow.docked .ebox{animation:none; padding:10px 20px; border:2px solid var(--battle);
     box-shadow:0 6px 20px rgba(15,28,23,.3);}
   #enemyShow .ename{font-size:calc(16px*var(--fs)); font-weight:900; color:var(--ink); margin-top:6px;}
@@ -315,6 +326,7 @@
         <button class="modebtn" data-mode="campaign"><span class="mico">⚔️</span><span data-i18n="modeCampaign">対戦（AI）</span></button>
         <button class="modebtn alt" data-mode="friends"><span class="mico">👥</span><span data-i18n="modeFriends">みんなで</span></button>
         <button class="modebtn solo" data-mode="solo"><span class="mico">🏔️</span><span data-i18n="modeSolo">ソロ無限のぼり</span></button>
+        <button class="modebtn resume" id="resumeBtn" style="display:none;background:var(--coin);box-shadow:0 4px 0 #b8860b"><span class="mico">📖</span><span data-i18n="resumeBtn">前回の続きから</span></button>
       </div>
       <div id="soloBest"></div>
     </div>
@@ -369,9 +381,20 @@
         <div class="seg" data-set="moveSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
       <div class="setrow"><div class="sl" data-i18n="setRoulSpd">ルーレットの速さ</div>
         <div class="seg" data-set="roulSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
+      <button class="btn" id="suspendBtn" style="display:none;background:var(--blue);box-shadow:0 4px 0 var(--blue-d)" data-i18n="suspendBtn">中断してタイトルへ</button>
       <button class="btn sub" id="setClose" data-i18n="close">とじる</button>
       <div class="tiny" style="text-align:center;margin-top:10px">スゴロクタワー / Spinner Tower <span id="appVer"></span><br>
         <a href="https://soyogi.hp.peraichi.com/top" target="_blank" rel="noopener" style="color:var(--sub)" data-i18n="creditOrg">介護と支援の相談どころ　そよぎ</a></div>
+    </div>
+  </div>
+
+  <!-- 中断データ（つづきから） -->
+  <div class="overlay" id="savePanel" style="display:none">
+    <div class="sheet shopsheet">
+      <h2 data-i18n="saveTitle">📖 つづきから</h2>
+      <p class="tiny" data-i18n="saveNote">えらぶと、そのデータは消えます。もう一度中断すれば、また保存できます。</p>
+      <div id="saveList"></div>
+      <button class="btn sub" id="saveClose" data-i18n="close">とじる</button>
     </div>
   </div>
 
@@ -396,7 +419,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.3.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.4.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（重ねた分だけ常時効果も重なる）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
@@ -454,7 +477,7 @@ const CARDS={
   s_warp:{r:'S',kind:'active',warp:'up2'},
   s_free:{r:'S',kind:'passive',freemove:true},
   s_sec:{r:'S',kind:'passive',security:10},
-  plus3:{r:'S',kind:'passive',plus:3},
+  plus12:{r:'S',kind:'active',plus:12},
   food_set:{r:'S',kind:'active',food:100,solo:true},
   candy:{r:'S',kind:'passive',candyHalf:true,solo:true},
   // A
@@ -463,7 +486,7 @@ const CARDS={
   a_warp:{r:'A',kind:'active',warp:'up1'},
   a_free:{r:'A',kind:'active',freemove:true},
   a_sec:{r:'A',kind:'passive',security:5},
-  plus2:{r:'A',kind:'passive',plus:2},
+  plus8:{r:'A',kind:'active',plus:8},
   shop_a:{r:'A',kind:'active',shop:5},
   free:{r:'A',kind:'active',free:true},
   phantom:{r:'A',kind:'active',phantom:true},
@@ -473,7 +496,7 @@ const CARDS={
   b_plus:{r:'B',kind:'passive',plus:3},
   b_warp:{r:'B',kind:'active',warp:'spot'},
   b_sec:{r:'B',kind:'passive',security:2},
-  plus1:{r:'B',kind:'passive',plus:1},
+  plus5:{r:'B',kind:'active',plus:5},
   shop_b:{r:'B',kind:'active',shop:2},
   stop7:{r:'B',kind:'active',stop:7},
   stop6:{r:'B',kind:'active',stop:6},
@@ -483,6 +506,7 @@ const CARDS={
   // 変身カード：使うと他のどれかのカードに変わる（カードマスの通常抽選で手に入る・2026-07-30ヒロ依頼）
   b_morph:{r:'B',kind:'active',morph:true},
   // C
+  plus3:{r:'C',kind:'active',plus:3},
   c_plus:{r:'C',kind:'passive',plus:2},
   c_free:{r:'C',kind:'active',freemove:true,rouletteLimit:[1,3]},
   c_warp:{r:'C',kind:'active',warp:'spotdown'},
@@ -516,8 +540,11 @@ function morphPick(p){
 }
 // パッシブ集計
 function rangeOf(p){ let lo=1,hi=7; for(const k of p.cards){ const c=CARDS[k]; if(c.roulette && c.roulette[1]>hi){lo=c.roulette[0];hi=c.roulette[1];} } return [lo,hi]; }
-// 🔴プラス系は合算しない＝持っている中で一番大きい1枚だけが効く（ヒロ仕様2026-07-30・ルーレット系と同じ扱い）
-function plusOf(p){ let m=0; for(const k of p.cards){ const v=CARDS[k].plus; if(v>m) m=v; } return m; }
+// 🔴プラスは2系統ある（ヒロ仕様2026-07-30）。
+//   ○プラス(s_plus/a_plus/b_plus/c_plus)＝パッシブ。持っているだけで効くが**合算せず一番大きい1枚だけ**。
+//   プラス○(plus3/plus5/plus8/plus12＝C/B/A/S)＝アクティブ。使った番だけ効き、パッシブ分に**上乗せ**される。
+//   カード名の数字＝加算値。例：プラス8を使い、Aプラスを持っている → +8+4=+12。
+function plusOf(p){ let m=0; for(const k of p.cards){ const c=CARDS[k]; if(c.kind==='passive' && c.plus>m) m=c.plus; } return m; }
 function hasFreemove(p){ return p.cards.some(k=>CARDS[k].freemove && CARDS[k].kind==='passive'); }
 function hasCandy(p){ return p.cards.some(k=>CARDS[k].candyHalf); }
 
@@ -713,10 +740,15 @@ function render(){
     const badge = pickable && G.wait.stepsOf && G.wait.stepsOf[id] ? `<span class="stepbadge">${G.wait.stepsOf[id]}</span>` : '';
     html+=`<div class="node type-${n.type}${pickable?' pick':''}" data-id="${id}" style="left:${x}px;bottom:${bt}px">${inner}${n.type==='battle'?`<span class="hp">HP${n.enemyHP}</span>`:''}${badge}</div>`;
   }
+  // 🔴目立たせるコマの決め方（2026-07-30ヒロ指定）
+  //   みんなで＝画面を全員で見るので、常時点滅は邪魔。今の番の人だけを、その時だけ大きく点滅させる。
+  //   それ以外＝自分のコマを常に大きく点滅（人数が多いと見失うため）。
+  const spot = G.mode==='friends' ? (G.running ? G.players[G.turn] : null) : G.me;
   G.players.forEach(p=>{ if(p.finished)return; const n=b.nodes[p.node]; if(!n)return;
-    const here=G.players.filter(q=>!q.finished&&q.node===p.node); const k=here.indexOf(p),off=(k-(here.length-1)/2)*15;
+    const here=G.players.filter(q=>!q.finished&&q.node===p.node); const k=here.indexOf(p),off=(k-(here.length-1)/2)*17;
     const iconStyle=p.icon?`;background-image:url(${p.icon})`:'';
-    html+=`<div class="tok${p.icon?' hasicon':''}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${p.mark}</div>`; });
+    const mine=(p===spot)?' mine':'';
+    html+=`<div class="tok${p.icon?' hasicon':''}${mine}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${p.mark}</div>`; });
   boardEl.innerHTML=`<svg id="tower"></svg><svg id="links"></svg>`+html;
   drawTower(); drawLinks(); bindNodes(); updateHUD();
 }
@@ -811,18 +843,18 @@ function scrollToShow(ids){
 $('#spinBtn').onclick=()=>{ if(G.wait&&G.wait.type==='spin') resolveWait(true); };
 
 // ============ ルーレット ============
-async function doSpin(p,{label=''}={}){
+async function doSpin(p,{label='',hint=''}={}){
   const ctx=p.turn||{};
   const roul=$('#roulette');
   if(roul) roul.textContent='?';   // 🔴回すたびに「?」から始める（前の数字を残さない）
-  if(!p.isAI){ msg(T('spinHint')); await waitFor('spin',{label}); }
+  if(!p.isAI){ msg(hint||T('spinHint')); await waitFor('spin',{label}); }
   else await sleep(400);
   let base,val;
   if(ctx.stop!=null){ base=ctx.stop; val=ctx.stop; }   // ストップは正確にN（プラス無視）
   else { const [lo,hi]=ctx.rouletteLimit||rangeOf(p);
     AU('sfx','spin');
     for(let i=0;i<9;i++){ roul.textContent=rand(lo,hi); await sleep(rlDelay(45+i*8)); }
-    base=rand(lo,hi); val=base+plusOf(p); }
+    base=rand(lo,hi); val=base+plusOf(p)+(ctx.plusAdd||0); }
   roul.textContent=val; AU('sfx','tick');
   if(label) msg(T('msgSpin',{name:p.name,label,val}) + (val!==base?T('dieShown',{n:base}):''));
   await sleep(rlDelay(230)); return {base,val};
@@ -959,19 +991,26 @@ async function movePlayer(p,rawSteps,ctx){
 function retreat(p,k){ for(let i=0;i<k&&p.path.length>1;i++) p.path.pop(); p.node=p.path[p.path.length-1]; }
 
 // ============ 着地 ============
-async function resolveLanding(p){
-  const n=G.board.nodes[p.node], ctx=p.turn||{};
-  const others=G.players.filter(o=>o!==p&&!o.finished&&o.node===p.node);
-  // 🔴同じマスに複数人いたら全員とバトル。負けた人は下がるので、勝者と引き分けだけがマスに残る（ヒロ仕様2026-07-30）
-  if(others.length){
-    const here=p.node;
+// 🔴同じマスに誰かいたら全員と対戦する（ヒロ仕様2026-07-30）。
+//   勝つ／引き分け＝そのマスに残る → そのマスのイベントが起きる。
+//   負ける＝下がる → 下がった先のマスで改めて判定する（そこにも誰かいれば、また対戦になる）。
+//   下がり続ける連鎖が終わらない事態を避けるため、繰り返しは8回で打ち切る。
+//   pvpOnly=true のときは対戦だけ行い、マスのイベントは起こさない（バトルロワイヤルで下がった人に使う）。
+async function resolveLanding(p,depth=0,pvpOnly=false){
+  const ctx=p.turn||{};
+  const here=p.node;
+  const others=G.players.filter(o=>o!==p&&!o.finished&&o.node===here);
+  if(others.length && depth<8){
     for(const o of others){
       if(p.node!==here) break;      // 自分が負けて下がったら、そこで打ち切り
       if(o.node!==here) continue;   // すでにこのマスから居なくなった人は飛ばす
       await pvpBattle(p,o);
     }
-    return;
+    if(p.node!==here){ await resolveLanding(p,depth+1,pvpOnly); return; }   // 負けて下がった＝下がった先で判定し直す
+    // 残った＝このマスのイベントへ進む
   }
+  if(pvpOnly){ render(); return; }
+  const n=G.board.nodes[p.node];
   switch(n.type){
     case 'coin':{ const c=rand(2,5); p.coins+=c; AU('sfx','coin'); msg(T('coinGet',{name:p.name,n:c})); break; }
     case 'diamond':{ const d=Math.random()<0.3?2:1; p.diamonds+=d; AU('sfx','diamond'); msg(T('diamondGet',{name:p.name,n:d})); break; }
@@ -997,6 +1036,8 @@ function showEnemy(hp){
   const sp=(window.ENEMY_SPRITES||{})[hp];
   const en=ENEMIES[hp]||{e:'⚔️'};
   const box=document.createElement('div'); box.id='enemyShow';
+  // HP5以上は64×64の描き込みがあるので大きく、HP8のドラゴンはさらに大きく出す
+  if(hp>=8) box.classList.add('boss'); else if(hp>=5) box.classList.add('big');
   box.innerHTML=`<div class="ebox">${sp?sp.svg:`<div style="font-size:72px">${en.e}</div>`}
     <div class="ename">${enemyName(hp)}</div><div class="ehp">${T('enemyPower',{n:hp})}</div></div>`;
   $('#app').appendChild(box);
@@ -1010,7 +1051,13 @@ async function enemyBattle(p,node){
   banner(T('enemyAppear',{emoji:en.e,ename,hp:node.enemyHP}),'var(--battle)');
   AU('playBGM','battle');
   AU('sfx','battleStart'); showEnemy(node.enemyHP); await sleep(1000);
-  const {val}=await doSpin(p,{label:T('fightLbl')});
+  // 🔴強敵(HP8=ドラゴン)は、いま持っているパッシブだけで届くかどうかを回す前に知らせる（2026-07-30ヒロ依頼）。
+  //   届かないなら「カードを使わないと勝てない」、届くなら「強敵だ」とだけ出す。
+  const reach=rangeOf(p)[1]+plusOf(p);
+  const hint = node.enemyHP>=8
+    ? T(reach<node.enemyHP ? 'enemyNeedCard' : 'enemyTough', {hp:node.enemyHP})
+    : '';
+  const {val}=await doSpin(p,{label:T('fightLbl'),hint});
   if(val>=node.enemyHP){ const loot=battleLoot(p,node.enemyHP); AU('sfx','win');
     // 🔴倒した敵は隠れるだけ＝次のターンにまた出てくる（ヒロ仕様2026-07-28）
     msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot}));
@@ -1023,7 +1070,7 @@ async function enemyBattle(p,node){
     p.lossAt=p.lossAt||{}; const cnt=(p.lossAt[node.id]=(p.lossAt[node.id]||0)+1);
     let mercy='';
     if(cnt%3===0){
-      const gift=pick(['plus1','plus2','c_plus','b_plus']);
+      const gift=pick(['plus3','plus5','c_plus','b_plus']);
       if(!canAddCard(p,gift)){ const i=p.cards.findIndex(k=>!CARDS[k].plus&&!CARDS[k].roulette); if(i>=0) removeCard(p,i); }
       if(canAddCard(p,gift)){ addCard(p,gift); mercy='　'+T('battleMercy'); }
     }
@@ -1043,14 +1090,36 @@ async function pvpBattle(a,b){
   AU('playBGM',fieldBGM());
 }
 // 敗者は逃げる時に落とし物を残し勝者が拾う（セキュリティで守れる）
+// 🔴負けた人が落とすもの（2026-07-30ヒロ指定で拡張）。
+//   カード1〜3枚／💎1〜3個／🪙1〜10枚 のうち、1種類・2種類・3種類全部のいずれかをランダムに落とす。
+//   5%の確率で何も落とさない（そのときは勝者も何も拾えない）。セキュリティがあれば身代わりで全部防ぐ。
 function takeFrom(win,lose){
-  const opts=[]; if(lose.cards.length)opts.push('card'); if(lose.diamonds>0)opts.push('d'); if(lose.coins>0)opts.push('c');
-  if(!opts.length) return T('tfNothing',{name:lose.name});
+  const kinds=[]; if(lose.cards.length)kinds.push('card'); if(lose.diamonds>0)kinds.push('d'); if(lose.coins>0)kinds.push('c');
+  if(!kinds.length) return T('tfNothing',{name:lose.name});
   if((lose.security||0)>0){ lose.security--; return T('tfGuard',{name:lose.name}); }
-  const r=pick(opts);
-  if(r==='card'){ const k=lose.cards.pop(); addCard(win,k); if(CARDS[k].security)lose.security=Math.max(0,lose.security-CARDS[k].security); return T('tfCard'); }
-  if(r==='d'){ lose.diamonds--; win.diamonds++; return T('tfD'); }
-  lose.coins--; win.coins++; return T('tfC');
+  if(Math.random()<0.05) return T('tfDropNone',{name:lose.name});   // まれに何も落とさない
+  shuffleArr(kinds);
+  const howMany=rand(1,kinds.length);                                // 1種類〜持っている種類すべて
+  const dropped=kinds.slice(0,howMany);
+  const parts=[];
+  if(dropped.includes('card')){
+    const n=Math.min(rand(1,3), lose.cards.length); let got=0;
+    for(let i=0;i<n;i++){ const k=lose.cards.pop(); if(k==null) break;
+      if(CARDS[k].security) lose.security=Math.max(0,lose.security-CARDS[k].security);
+      if(canAddCard(win,k)) addCard(win,k);                          // 勝者の手札が上限なら拾えず消える
+      got++; }
+    if(got) parts.push(T('tfNCard',{n:got}));
+  }
+  if(dropped.includes('d')){
+    const n=Math.min(rand(1,3), lose.diamonds);
+    if(n>0){ lose.diamonds-=n; win.diamonds+=n; parts.push(T('tfND',{n})); }
+  }
+  if(dropped.includes('c')){
+    const n=Math.min(rand(1,10), lose.coins);
+    if(n>0){ lose.coins-=n; win.coins+=n; parts.push(T('tfNC',{n})); }
+  }
+  if(!parts.length) return T('tfDropNone',{name:lose.name});
+  return T('tfPicked',{list:parts.join('　')});
 }
 
 // ============ カードの使用（回す前） ============
@@ -1059,7 +1128,9 @@ async function useCard(p,i){
   // 🔴アクティブは重ね掛けできない＝1つの番に1枚だけ（パッシブは持っている分だけ重なる）
   if(p.turn&&p.turn.usedActive){ msg(T('oneActivePerTurn')); return; }
   if(p.turn) p.turn.usedActive=true;
-  if(c.stop!=null){ p.turn.stop=c.stop; removeCard(p,i); msg(T('useStop',{card:cardName(k),n:c.stop})); }
+  if(c.plus!=null && c.kind==='active'){ p.turn.plusAdd=(p.turn.plusAdd||0)+c.plus; removeCard(p,i);
+    msg(T('usePlus',{card:cardName(k),n:c.plus})); }
+  else if(c.stop!=null){ p.turn.stop=c.stop; removeCard(p,i); msg(T('useStop',{card:cardName(k),n:c.stop})); }
   else if(c.free){ p.turn.free=true; removeCard(p,i); msg(T('useFree')); }
   else if(c.freemove){ p.turn.freemove=true; if(c.rouletteLimit)p.turn.rouletteLimit=c.rouletteLimit; removeCard(p,i); msg(T('useFreemove')); }
   else if(c.phantom){ p.turn.phantom=true; removeCard(p,i); msg(T('usePhantom')); }
@@ -1145,14 +1216,144 @@ async function doEvent(p){
     opp.forEach(o=>{ if(moveItemTo(p,o)) cnt++; }); return cnt? T('evWind',{n:cnt}) : T('evWindNone'); });
   evs.push(()=>{ const n=rand(3,7); drawCard(p,n); return T('evCards',{n}); });
   evs.push(async()=>{ await openShop(p,{buyback:true,sellMult:3}); return T('evBuyback'); });
-  evs.push(async()=>{ await openShop(p,{exchange:true}); return T('evExchange'); });
+  // 🔴換金所は「？」から外し、代わりに小さな品ぞろえのショップにした（2026-07-30ヒロ指定）。
+  //   ふつうのショップマスは5枚。こちらは3枚だけの出張店。
+  evs.push(async()=>{ await openShop(p,{cards:3,buyback:true}); return T('evMiniShop'); });
   evs.push(()=>{ retreat(p,7); drawCard(p,5); return T('evStrong',{back:7,n:5}); });
   evs.push(()=>{ retreat(p,5); drawCard(p,3); return T('evStrong',{back:5,n:3}); });
   evs.push(()=>{ retreat(p,2); drawCard(p,1); return T('evStrong',{back:2,n:1}); });
   evs.push(()=>{ const d=rand(1,3),c=rand(3,10); p.diamonds+=d; p.coins+=c; return T('evTreasure',{d,c}); });
+  // 小さな拾いもの（2026-07-30ヒロ追加）
+  evs.push(()=>{ p.diamonds+=1; AU('sfx','diamond'); return T('evFindD'); });
+  evs.push(()=>{ p.coins+=1;   AU('sfx','coin');    return T('evFindC1'); });
+  evs.push(()=>{ p.coins+=2;   AU('sfx','coin');    return T('evFindC2'); });
+  evs.push(()=>{ drawCard(p,1); AU('sfx','card');   return T('evFindK1'); });
+  evs.push(()=>{ drawCard(p,2); AU('sfx','card');   return T('evFindK2'); });
+  // 🔴敵バトル（2026-07-30ヒロ指定）。低い階でもドラゴンに出会える唯一の道。
+  //   HP8=3% / HP7=5% / HP6=7% / HP5=10% / HP4・3・2=25%ずつ
+  evs.push(async()=>{ const hp=rollEventEnemyHP();
+    await enemyBattle(p,{id:'ev',type:'battle',enemyHP:hp,floor:G.board.nodes[p.node].floor});
+    return T('evEnemy',{name:enemyName(hp),hp}); });
+  // ショップ3段階（2026-07-30ヒロ指定）。ミニ3枚 → 通常5枚 → デパート8枚
+  evs.push(async()=>{ await openShop(p,{cards:5,buyback:true,exchange:true}); return T('evShop'); });
+  evs.push(async()=>{ await openShop(p,{cards:8,buyback:true,exchange:true}); return T('evDept'); });
+  // 🔴ひとりでは成立しないイベント（つむじ風・竜巻・バトルロワイヤル）はソロでは出さない
+  if(!solo){
+    evs.push(async()=>await evTornado(p));
+    evs.push(async()=>await evRoyale(p));
+    evs.push(async()=>await evSummon(p));
+    evs.push(async()=>await evDragonTrial(p));
+  }
   if(solo){ evs.push(()=>{ const h=rand(5,30); p.hp=Math.min(p.hpMax,p.hp+h); return T('evFood',{n:h}); });
     evs.push(()=>{ const h=rand(5,30); p.hp-=h; return T('evFoodBad',{n:h}); }); }
   const r=pick(evs); const out=await r(); msg(`${p.name}：${out}`); render(); await sleep(700);
+}
+function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=rand(0,i); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
+// 「？」マスの敵バトルの相手を決める（階に関係なくこの表で抽選する＝低い階でもドラゴンが出る）
+const EV_ENEMY_ODDS=[[8,3],[7,5],[6,7],[5,10],[4,25],[3,25],[2,25]];   // [HP, %]
+function rollEventEnemyHP(){
+  let r=Math.random()*100;
+  for(const [hp,pct] of EV_ENEMY_ODDS){ if(r<pct) return hp; r-=pct; }
+  return 2;
+}
+// 🔴竜巻：全員のコマの位置を入れ替え、持ち物を全部あつめてランダムに配り直す（2026-07-30ヒロ指定）。
+//   大逆転も大転落も起きる。ソロでは出さない。
+async function evTornado(p){
+  const ps=G.players.filter(o=>!o.finished);
+  if(ps.length<2) return T('evTornadoNone');
+  banner(T('evTornadoBanner'),'var(--event)'); AU('sfx','warp'); await sleep(700);
+  // 位置の入れ替え（pathも一緒に動かさないと、あとで下がるときにおかしくなる）
+  const spots=shuffleArr(ps.map(o=>({node:o.node,path:o.path.slice()})));
+  ps.forEach((o,i)=>{ o.node=spots[i].node; o.path=spots[i].path; });
+  // 持ち物を全部あつめる
+  let pool=[], d=0, c=0;
+  ps.forEach(o=>{ pool=pool.concat(o.cards); d+=o.diamonds; c+=o.coins;
+    o.cards=[]; o.diamonds=0; o.coins=0; o.security=0; });
+  // 配り直す（手札の上限に入らないカードは、入る人を何度か探してから諦める）
+  shuffleArr(pool).forEach(k=>{ for(let t=0;t<8;t++){ const o=pick(ps); if(canAddCard(o,k)){ addCard(o,k); return; } } });
+  for(let i=0;i<d;i++) pick(ps).diamonds++;
+  for(let i=0;i<c;i++) pick(ps).coins++;
+  render(); autoScroll(p); await sleep(500);
+  return T('evTornado',{n:ps.length});
+}
+// 🔴バトルロワイヤル（2026-07-30ヒロ指定）。全員をこのマスに集めて、全員が1回ずつルーレットを回す。
+//   いちばん大きい出目の人（同点も含む）だけがマスに残り、1でも少ない人は「差×5」マスもどる。
+//   ここでは落とし物は発生しない。もどった先が同じマスになった人どうしは通常の対戦になる。
+//   もどった人はマスのイベントを起こさない（対戦だけ最後まで続く）。
+async function evRoyale(p){
+  const all=G.players.filter(o=>!o.finished);
+  if(all.length<2) return T('evRoyaleNone');
+  banner(T('evRoyaleBanner'),'var(--battle)'); AU('playBGM','duel'); await sleep(700);
+  const here=p.node;
+  all.forEach(o=>{ if(o.node!==here){ o.node=here; o.path.push(here); } });
+  render(); autoScroll(p); await sleep(600);
+  // 🔴全員が1回ずつ回す。最大の人（と同点の人）だけがマスに残る。
+  const rolls=[];
+  for(const o of all){ const r=await doSpin(o,{label:T('duelLbl')}); rolls.push({o,val:r.val}); await sleep(140); }
+  const max=Math.max.apply(null,rolls.map(r=>r.val));
+  const stay=rolls.filter(r=>r.val===max), lost=rolls.filter(r=>r.val<max);
+  // 🔴1でも少なければ、差の5倍もどる。落とし物は無し（通常の対戦とちがって取られない）。
+  lost.forEach(r=>retreat(r.o,(max-r.val)*5));
+  render(); autoScroll(p); await sleep(700);
+  msg(T('evRoyaleResult',{n:max,stay:stay.map(r=>r.o.name).join('、'),back:lost.length}));
+  await sleep(700);
+  AU('playBGM',fieldBGM());
+  // 🔴同じ差でもどった人は同じマスに集まる＝そこで通常の対戦になる（マスのイベントは起こさない）。
+  //   1マスにつき1回だけ呼ぶ。全員ぶん呼ぶと同じ組み合わせが2回戦ってしまうため。
+  const seen=new Set();
+  for(const r of lost){
+    if(r.o.finished || seen.has(r.o.node)) continue;
+    seen.add(r.o.node);
+    await resolveLanding(r.o,0,true);
+  }
+  // 起こした人が残っていれば、このマスのイベントは「ロワイヤル」そのものなのでここで終わり
+  return T('evRoyale',{n:all.length-1});
+}
+// 🔴ドラゴン挑戦（2026-07-30ヒロ指定）。全員を集めて、ひとりずつドラゴン(HP8)に挑む。
+//   勝てばカード3枚・💎3・🪙15。負けても何も失わない。終わったら全員そのままの位置に戻る。
+//   危険のないごほうびイベント＝「こんな強敵がいる」と知ってもらうのが目的。
+async function evDragonTrial(p){
+  const all=G.players.filter(o=>!o.finished);
+  const HP=8;
+  banner(T('evDragonBanner'),'var(--battle)'); AU('playBGM','battle'); await sleep(700);
+  const home=all.map(o=>({o,node:o.node,path:o.path.slice()}));   // 元の位置を控える
+  const here=p.node;
+  all.forEach(o=>{ if(o.node!==here){ o.node=here; o.path.push(here); } });
+  render(); autoScroll(p); await sleep(500);
+  showEnemy(HP); await sleep(1100);
+  let winners=0;
+  for(const o of all){
+    const reach=rangeOf(o)[1]+plusOf(o);
+    const hint=T(reach<HP?'enemyNeedCard':'enemyTough',{hp:HP});
+    const {val}=await doSpin(o,{label:T('fightLbl'),hint});
+    if(val>=HP){
+      drawCard(o,3); o.diamonds+=3; o.coins+=15; winners++;
+      AU('sfx','win'); msg(T('evDragonWin',{name:o.name}));
+    } else {
+      AU('sfx','lose'); msg(T('evDragonLose',{name:o.name}));
+    }
+    render(); await sleep(700);
+  }
+  hideEnemy(); AU('playBGM',fieldBGM());
+  home.forEach(h=>{ h.o.node=h.node; h.o.path=h.path; });          // 全員そのままの位置へ
+  render(); autoScroll(p); await sleep(600);
+  return T('evDragon',{n:winners});
+}
+// 🔴呼び出し：階の近い1〜2番目の人からひとりを呼んで、ふつうの対戦をする（2026-07-30ヒロ指定）。
+async function evSummon(p){
+  const others=G.players.filter(o=>o!==p&&!o.finished);
+  if(!others.length) return T('evSummonNone');
+  const myFloor=G.board.nodes[p.node].floor;
+  // 階の差が小さい順に並べ、1番目か2番目をランダムに選ぶ
+  const near=others.slice().sort((x,y)=>
+    Math.abs(G.board.nodes[x.node].floor-myFloor)-Math.abs(G.board.nodes[y.node].floor-myFloor));
+  const target=near[rand(0,Math.min(1,near.length-1))];
+  banner(T('evSummonBanner',{name:target.name}),'var(--battle)'); await sleep(600);
+  const here=p.node;
+  target.node=here; target.path.push(here);
+  render(); autoScroll(p); await sleep(500);
+  await pvpBattle(p,target);                       // 結果は通常の対戦と同じ（もどるのは差のぶん）
+  return T('evSummon',{name:target.name});
 }
 function moveItemTo(from,to){
   const opts=[]; if(from.cards.length)opts.push('card'); if(from.diamonds>0)opts.push('d'); if(from.coins>0)opts.push('c');
@@ -1231,7 +1432,7 @@ async function takeTurn(p){
   if(reviveEnemies()) render();                 // 隠れていた敵がもどる
   // 🔴ストップは番をまたいで残さない。残すと、対戦バトルで受け手側になったときに
   //   その人の前の番の出目指定が効いてしまう（p.turnは各自の前の番のものが残るため）。
-  G.players.forEach(x=>{ if(x.turn){ x.turn.stop=null; x.turn.rouletteLimit=null; } });
+  G.players.forEach(x=>{ if(x.turn){ x.turn.stop=null; x.turn.rouletteLimit=null; x.turn.plusAdd=0; } });
   p.turn={}; banner(T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name}),p.color); autoScroll(p); renderHand(); await sleep(300);
   if(p.isAI) aiEndgamePrep(p);
   const {val}=await doSpin(p,{label:T('moveLbl')});
@@ -1270,6 +1471,79 @@ async function decideOrder(){
 }
 async function gameLoop(){ G.running=true;
   while(G.running){ const p=currentPlayer(); if(!p.finished){ await takeTurn(p); if(!G.running) break; } advanceTurn(); await sleep(100); } }
+
+// ============ 中断とつづき（2026-07-30ヒロ依頼・後半が長いのでセーブが要る） ============
+// 🔴仕様: 中断データは3つまで。**再開したらその枠は消す**（同じ場面を何度もやり直せないようにするため）。
+//   保存するのは盤面と全員の状態だけ。関数やDOMは入れない（G.waitは入れない）。
+const SAVE_KEY='gt_saves', SAVE_MAX=3;
+function loadSaves(){
+  try{ const a=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]'); return Array.isArray(a)?a.slice(0,SAVE_MAX):[]; }
+  catch(e){ return []; }
+}
+function writeSaves(a){
+  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(a.slice(0,SAVE_MAX))); return true; }
+  catch(e){ return false; }   // 容量オーバー等は呼び出し側で知らせる
+}
+function hasSaves(){ return loadSaves().length>0; }
+// いまの局面を素のデータに落とす
+function serializeGame(){
+  return {
+    v:2, ts:Date.now(), mode:G.mode, stage:G.stage||0,
+    style:G.style, board:G.board, turn:G.turn, turnNo:G.turnNo||0,
+    hidden:G.hidden||[], meIdx:Math.max(0,G.players.indexOf(G.me)),
+    friends: G.mode==='friends' ? G.friends : null,
+    players: G.players.map(p=>Object.assign({},p,{turn:{}}))   // 番の途中の一時状態は持ち越さない
+  };
+}
+// 見出し（何の続きかが一目で分かるように）
+function saveLabel(s){
+  const modeName = s.mode==='campaign' ? T('modeCampaign') : s.mode==='friends' ? T('modeFriends') : T('modeSolo');
+  const me = s.players[s.meIdx] || s.players[0] || {};
+  const node = s.board && s.board.nodes ? s.board.nodes[me.node] : null;
+  const floor = node ? node.floor : 0;
+  const stagePart = s.mode==='campaign' ? '　'+T('st'+(s.stage||0)) : '';
+  return modeName + stagePart + '　' + T('floorsUnit',{n:floor});
+}
+function suspendGame(){
+  if(!G.running || !G.board){ return; }
+  const list=loadSaves();
+  list.unshift(serializeGame());
+  if(!writeSaves(list)){ msg(T('saveFull')); return; }
+  G.running=false; G.wait=null;
+  $('#setPanel').style.display='none';
+  AU('sfx','button');
+  showTitle();
+  banner(T('saved'),'var(--blue)');
+}
+function renderSaveList(){
+  const list=loadSaves(), el=$('#saveList');
+  if(!list.length){ el.innerHTML=`<p class="tiny">${T('saveNone')}</p>`; return; }
+  el.innerHTML=list.map((s,i)=>`<button class="stagebtn" data-i="${i}">
+    <span class="snum">${i+1}</span>
+    <span class="sinfo">${saveLabel(s)}<div class="sdesc">${T('savePlayers',{n:s.players.length})}</div></span></button>`).join('');
+  el.querySelectorAll('.stagebtn').forEach(b=>b.onclick=()=>{
+    AU('sfx','button');
+    const idx=+b.dataset.i, all=loadSaves(), s=all[idx];
+    if(!s) return;
+    all.splice(idx,1); writeSaves(all);   // 🔴読み込んだ枠はここで消す（やり直し防止）
+    $('#savePanel').style.display='none';
+    resumeGame(s);
+  });
+}
+function resumeGame(s){
+  G.mode=s.mode; G.stage=s.stage||0; G.style=s.style; G.board=s.board;
+  G.players=s.players; G.turn=s.turn||0; G.turnNo=s.turnNo||0; G.hidden=s.hidden||[];
+  G.players.forEach(p=>{ p.turn=p.turn||{}; });
+  G.me=G.players[s.meIdx] || G.players.find(p=>!p.isAI) || G.players[0];
+  if(s.friends) G.friends=s.friends;
+  G.wait=null;
+  $('#titleScreen').style.display='none'; $('#modeConfig').style.display='none';
+  $('#stamwrap').style.display=G.mode==='solo'?'block':'none';
+  AU('playBGM', fieldBGM());
+  render(); autoScroll(G.me);
+  msg(T('resumed'));
+  gameLoop();
+}
 
 // ============ 終了・演出 ============
 // 称号（ヒロ確定・2026-07-28）：50/100/200/500階。到達のたびコングラチュレーション演出
@@ -1420,7 +1694,14 @@ document.querySelectorAll('#setPanel .seg').forEach(seg=>{
     applySettings(); AU('sfx','button');
   });
 });
-function openSettings(){ $('#setPanel').style.display='flex'; applySettings(); }
+function openSettings(){
+  $('#setPanel').style.display='flex'; applySettings();
+  // 中断はゲーム中だけ出す（タイトルでは意味がないので隠す）
+  $('#suspendBtn').style.display = (G.running && G.board) ? 'block' : 'none';
+}
+$('#suspendBtn').onclick=()=>suspendGame();
+$('#resumeBtn').onclick=()=>{ audioBoot(); AU('sfx','button'); renderSaveList(); $('#savePanel').style.display='flex'; };
+$('#saveClose').onclick=()=>{ $('#savePanel').style.display='none'; AU('sfx','button'); };
 $('#gearBtn').onclick=()=>{ audioBoot(); openSettings(); };
 $('#gearBtn2').onclick=()=>openSettings();
 $('#setClose').onclick=()=>{ $('#setPanel').style.display='none'; AU('sfx','button'); };
@@ -1435,6 +1716,7 @@ function renderLangList(){
 function showTitleTexts(){  // タイトル画面の動的テキストを現在言語で更新
   const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
   $('#soloBest').textContent = best? T('soloBest',{f:best.floor,t:best.tiles,ti:titleFor(best.floor)}) : '';
+  const rb=$('#resumeBtn'); if(rb) rb.style.display = hasSaves()? 'flex' : 'none';   // 中断データがある時だけ出す
 }
 $('#langBtn').onclick=()=>{ audioBoot(); renderLangList(); $('#langPanel').style.display='flex'; };
 $('#langClose').onclick=()=>{ $('#langPanel').style.display='none'; AU('sfx','button'); };
