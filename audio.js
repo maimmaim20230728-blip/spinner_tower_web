@@ -17,7 +17,8 @@
   var sfxVol = 1;          // 効果音倍率 0..3
   var muted = false;
 
-  var BGM_BASE = 0.22;     // BGMの標準ゲイン（倍率1のとき）
+  // 🔴BGMが効果音に比べて小さすぎたため 0.22 → 0.45 へ引き上げ（2026-07-30ヒロ指摘・約2倍）
+  var BGM_BASE = 0.45;     // BGMの標準ゲイン（倍率1のとき）
   var SFX_BASE = 0.55;     // 効果音の標準ゲイン（倍率1のとき）
 
   var LOOKAHEAD = 0.12;    // 先読みスケジュール秒
@@ -97,6 +98,20 @@
   function bell(tr, time, midi, dur, level) {
     voice(tr, time, midi, dur, 'sine', level, true);
     voice(tr, time, midi + 19, dur * 0.5, 'sine', level * 0.4, true);
+  }
+
+  // BGM用の打点ノイズ。効果音の noise() はSFXバス直結なのでBGMには使えない＝こちらはトラックのバスへ。
+  function perc(tr, time, dur, level, freq, hp) {
+    var src = ctx.createBufferSource();
+    src.buffer = noiseBuf;
+    var f = ctx.createBiquadFilter();
+    f.type = hp ? 'highpass' : 'lowpass';
+    f.frequency.value = freq == null ? 1800 : freq;
+    var g = ctx.createGain();
+    g.gain.setValueAtTime(level, time);
+    g.gain.exponentialRampToValueAtTime(0.0001, time + dur);
+    src.connect(f); f.connect(g); g.connect(tr.gain);
+    src.start(time); src.stop(time + dur + 0.03);
   }
 
   // --- 各BGMのステップ関数（step: 16分音符単位） ---------------------------
@@ -275,9 +290,49 @@
     }
   }
 
+  // バトル（対モンスター）：速い刻みと不穏な短調（Dマイナー・2小節でぐるぐる回す）
+  var BATT_CH = [
+    [50, 57, 65], [48, 55, 63]
+  ];
+  function stepBattle(tr, step, t) {
+    var bar = Math.floor(step / 16) % 2;
+    var p = step % 16;
+    var ch = BATT_CH[bar];
+    if (p === 0) pad(tr, t, ch, 1.0, 'sawtooth', 0.06);            // 短い不穏なパッド
+    voice(tr, t, ch[0] - 24, 0.12, 'square', 0.17, false);          // 16分の突っ走るベース
+    if (p % 4 === 0) perc(tr, t, 0.06, 0.16, 2600, true);           // 刻みの打点
+    if (p % 8 === 4) perc(tr, t, 0.14, 0.12, 220, false);           // 低い胴の音
+    if (p % 2 === 1) {                                              // 裏拍の刺すようなリード
+      var mel = [ch[2] + 12, ch[1] + 12, ch[2] + 12, ch[0] + 24,
+                 ch[1] + 12, ch[2] + 12, ch[0] + 24, ch[1] + 12];
+      voice(tr, t, mel[((p - 1) / 2) % 8], 0.14, 'sawtooth', 0.09, true);
+    }
+  }
+
+  // 対戦バトル（プレイヤー同士）：勇ましく明るい決闘（Aマイナー→ハ長調寄り・2小節）
+  var DUEL_CH = [
+    [45, 52, 60], [48, 55, 64]
+  ];
+  function stepDuel(tr, step, t) {
+    var bar = Math.floor(step / 16) % 2;
+    var p = step % 16;
+    var ch = DUEL_CH[bar];
+    if (p === 0) pad(tr, t, ch, 1.1, 'triangle', 0.08);
+    if (p % 4 === 0) voice(tr, t, ch[0] - 12, 0.2, 'square', 0.19, false);  // 行進するベース
+    else if (p % 4 === 2) voice(tr, t, ch[1] - 12, 0.16, 'square', 0.12, false);
+    if (p % 8 === 0) perc(tr, t, 0.05, 0.14, 3000, true);                   // ファンファーレの打点
+    if (p % 2 === 0) {                                                       // ラッパ風の主旋律
+      var mel = [ch[2], ch[2] + 4, ch[2] + 7, ch[2] + 4,
+                 ch[1] + 12, ch[2] + 7, ch[2] + 4, ch[2]];
+      bell(tr, t, mel[(p / 2) % 8], 0.34, 0.09);
+    }
+  }
+
   // BGM定義（bpm・小節数・ステップ関数／dly,fb,wet はディレイの任意調整）
   var BGM = {
     title:    { bpm: 92,  bars: 8, step: stepTitle },
+    battle:   { bpm: 152, bars: 2, step: stepBattle, dly: 0.5, fb: 0.14, wet: 0.22 },
+    duel:     { bpm: 138, bars: 2, step: stepDuel,   dly: 0.5, fb: 0.18, wet: 0.30 },
     campaign: { bpm: 122, bars: 4, step: stepCampaign },
     friends:  { bpm: 128, bars: 4, step: stepFriends },
     solo:     { bpm: 74,  bars: 4, step: stepSolo },
