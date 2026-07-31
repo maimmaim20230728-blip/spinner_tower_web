@@ -290,6 +290,113 @@
     }
   }
 
+  // --- 特殊塔のBGM（tower_gold / card / trick / battle） --------------------
+
+  // ゴールドタワー：宝物庫のきらめき。高音のベルが主役＋堅実なベース（Cメジャー・4小節）
+  var GOLD_CH = [
+    [48, 55, 64], [45, 52, 64], [41, 53, 60], [43, 55, 62]
+  ];
+  var GOLD_MEL = [                                                 // 8分音符8つ（0＝休符）
+    [72, 0, 76, 0, 79, 0, 84, 79],
+    [81, 0, 76, 0, 72, 0, 76, 0],
+    [77, 0, 81, 0, 84, 0, 81, 77],
+    [79, 0, 83, 0, 86, 0, 83, 79]
+  ];
+  function stepTowerGold(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = GOLD_CH[bar];
+    if (p === 0) pad(tr, t, ch, 2.4, 'triangle', 0.06);            // 明るく広いパッド
+    // 4分の堅実なベース（根音と5度を行き来する）
+    if (p % 4 === 0) voice(tr, t, (p / 4) % 2 === 0 ? ch[0] : ch[1], 0.30, 'square', 0.16, false);
+    if (p % 8 === 4) perc(tr, t, 0.05, 0.05, 6000, true);          // 金貨がこすれる細かい輝き
+    if (p % 2 === 0) {                                             // 主役のベル
+      var n = GOLD_MEL[bar][p / 2];
+      if (n) bell(tr, t, n, 0.8, 0.10);
+    }
+  }
+
+  // カードタワー：神秘的な魔術の館。ハープ風の下降アルペジオ＋薄いパッド（Eマイナー・4小節）
+  var CARD_CH = [
+    [40, 47, 55], [36, 43, 52], [45, 52, 60], [47, 54, 63]
+  ];
+  var CARD_ARP = [                                                 // 8分音符8つ・上からこぼれ落ちる
+    [79, 76, 71, 67, 64, 59, 55, 52],
+    [79, 76, 72, 67, 64, 60, 55, 52],
+    [81, 76, 72, 69, 64, 60, 57, 52],
+    [78, 75, 71, 69, 66, 63, 59, 54]
+  ];
+  function stepTowerCard(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = CARD_CH[bar];
+    if (p === 0) pad(tr, t, ch, 3.4, 'sine', 0.06);                // 霧のような薄いパッド
+    if (p === 0) voice(tr, t, ch[0], 1.8, 'sine', 0.13, false);    // 静かな低音
+    if (p === 8) voice(tr, t, ch[1], 0.9, 'triangle', 0.04, true); // 中音のかすかな返し
+    // ハープ風の下降アルペジオ（短く弾いて余韻はディレイに預ける）
+    if (p % 2 === 0) voice(tr, t, CARD_ARP[bar][p / 2], 0.26, 'triangle', 0.08, true);
+    // 2小節に1度、めくれたカードのような鐘
+    if (p === 14 && bar % 2 === 1) bell(tr, t, ch[2] + 24, 1.6, 0.07);
+  }
+
+  // トリックタワー：奇術とサーカス。跳ねるスタッカートと半音の悪戯（Aマイナー・4小節）
+  var TRICK_CH = [
+    [45, 52, 60], [40, 50, 56], [38, 45, 53], [40, 50, 56]
+  ];
+  var TRICK_MEL = [                                                // 8分音符8つ（0＝休符）
+    [69, 71, 72, 71, 69, 68, 69, 0],
+    [68, 69, 70, 71, 72, 71, 70, 68],
+    [74, 73, 72, 71, 70, 69, 68, 69],
+    [71, 0, 68, 0, 71, 72, 71, 68]
+  ];
+  function stepTowerTrick(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = TRICK_CH[bar];
+    // ウンパ伴奏（表拍に低音・裏拍に和音の切り込み）
+    if (p % 4 === 0) voice(tr, t, ch[0], 0.12, 'square', 0.16, false);
+    else if (p % 4 === 2) {
+      voice(tr, t, ch[1], 0.08, 'square', 0.07, false);
+      voice(tr, t, ch[2], 0.08, 'square', 0.06, false);
+    }
+    if (p % 8 === 0) perc(tr, t, 0.08, 0.12, 320, false);          // 太鼓のドン
+    if (p % 4 === 2) perc(tr, t, 0.03, 0.09, 4200, true);          // 木のカッ
+    if (p % 2 === 0) {                                             // 跳ねる半音のメロディ
+      var n = TRICK_MEL[bar][p / 2];
+      if (n) voice(tr, t, n, 0.09, 'square', 0.10, true);
+    }
+    // 最後だけ落ちる影＝何か起きそうな不穏
+    if (bar === 3 && p === 12) glide(tr, t, 57, 45, 0.45, 'sawtooth', 0.06, true);
+  }
+
+  // バトルタワー：登坂中の勇壮な行進曲（Dマイナー・4小節。戦闘中の battle とは別物で密度は控えめ）
+  var BTWR_CH = [
+    [38, 45, 53], [34, 41, 50], [36, 43, 52], [38, 45, 53]
+  ];
+  var BTWR_MEL = [                                                 // 8分音符8つ（0＝休符）
+    [62, 0, 62, 65, 69, 0, 65, 62],
+    [70, 0, 69, 0, 65, 0, 62, 0],
+    [64, 0, 67, 72, 0, 69, 67, 0],
+    [69, 0, 65, 0, 62, 0, 62, 0]
+  ];
+  function stepTowerBattle(tr, step, t) {
+    var bar = Math.floor(step / 16) % 4;
+    var p = step % 16;
+    var ch = BTWR_CH[bar];
+    if (p === 0 || p === 8) pad(tr, t, ch, 0.45, 'sawtooth', 0.05); // 短く踏み込む和音
+    if (p % 8 === 0) perc(tr, t, 0.16, 0.20, 130, false);           // キック（低く重い）
+    if (p % 8 === 4) perc(tr, t, 0.11, 0.14, 2400, true);           // スネア
+    if (p % 4 === 2) perc(tr, t, 0.03, 0.05, 7000, true);           // 刻みのハイハット
+    if (p % 2 === 0) {
+      // 8分のユニゾンベース（オクターブ重ねで太くする）
+      voice(tr, t, ch[0], 0.18, 'square', 0.15, false);
+      voice(tr, t, ch[0] + 12, 0.18, 'sawtooth', 0.06, false);
+      // ラッパ風の主旋律
+      var n = BTWR_MEL[bar][p / 2];
+      if (n) voice(tr, t, n, 0.22, 'sawtooth', 0.10, true);
+    }
+  }
+
   // バトル（対モンスター）：速い刻みと不穏な短調（Dマイナー・2小節でぐるぐる回す）
   var BATT_CH = [
     [50, 57, 65], [48, 55, 63]
@@ -336,6 +443,11 @@
     campaign: { bpm: 122, bars: 4, step: stepCampaign },
     friends:  { bpm: 128, bars: 4, step: stepFriends },
     solo:     { bpm: 74,  bars: 4, step: stepSolo },
+    // 特殊塔
+    tower_gold:   { bpm: 96,  bars: 4, step: stepTowerGold,   dly: 0.5,  fb: 0.28, wet: 0.46 },
+    tower_card:   { bpm: 88,  bars: 4, step: stepTowerCard,   dly: 0.75, fb: 0.32, wet: 0.55 },
+    tower_trick:  { bpm: 132, bars: 4, step: stepTowerTrick,  dly: 0.5,  fb: 0.16, wet: 0.26 },
+    tower_battle: { bpm: 120, bars: 4, step: stepTowerBattle, dly: 0.5,  fb: 0.14, wet: 0.20 },
     // 塔のスキン別
     tower_stone: { bpm: 54,  bars: 4, step: stepTowerStone, dly: 0.75, fb: 0.22, wet: 0.45 },
     tower_brick: { bpm: 104, bars: 4, step: stepTowerBrick, dly: 0.5,  fb: 0.18, wet: 0.35 },

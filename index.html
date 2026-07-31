@@ -449,7 +449,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.5.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -485,6 +485,14 @@ const STYLES=[
   {name:'苔むす古塔',brick:'#7f9a68',mortar:'#566f46',cap:'#a6c088',shape:'tower',bgm:'tower_moss'},
   {name:'砂の遺跡',brick:'#d8b877',mortar:'#b2955c',cap:'#ecd6a0',shape:'pyramid',bgm:'tower_sand'},
   {name:'蒼氷の塔',brick:'#8fc6dd',mortar:'#5f97b0',cap:'#c3e6f2',shape:'tower',bgm:'tower_ice'},
+  // 🔴特殊塔4種(2026-07-31ヒロ指定)。mod=マスの置き換え・rates=出現率の差し替え。
+  //   置き換えは抽選直後(makeNode)に行う＝ソロ無限の継ぎ足しにも自動で効き、
+  //   詰み対策の安全網(escape/ドラゴン手前カード/safeRoute)はその後に走るので保たれる。
+  {name:'ゴールドタワー',brick:'#d2a93c',mortar:'#9c7a24',cap:'#f2d97a',shape:'tower',bgm:'tower_gold',mod:'gold'},
+  {name:'カードタワー',brick:'#9a6fc4',mortar:'#6b4a8e',cap:'#c9aae8',shape:'tower',bgm:'tower_card',mod:'card'},
+  {name:'トリックタワー',brick:'#c76fa8',mortar:'#94477a',cap:'#eaa3cf',shape:'tower',bgm:'tower_trick',mod:'trick'},
+  {name:'バトルタワー',brick:'#a6493f',mortar:'#6e2b24',cap:'#cf7263',shape:'tower',bgm:'tower_battle',
+    rates:{coin:26,diamond:6,card:8,battle:45,event:5,warp:5,shop:5}},
 ];
 const CHEST_SVG=`<svg viewBox="0 0 52 42" width="46" height="37" xmlns="http://www.w3.org/2000/svg">
   <rect x="5" y="18" width="42" height="21" rx="3" fill="#8a5a2b" stroke="#5a3a1c" stroke-width="2"/>
@@ -583,15 +591,25 @@ function hasCandy(p){ return p.cards.some(k=>CARDS[k].candyHalf); }
 const G={mode:'campaign',diff:0,pcount:2,style:STYLES[0],board:null,players:[],turn:0,running:false,wait:null};
 
 // ============ 盤面生成（空マスなし・コインはダイヤ約5倍・関所なし） ============
+// 基本の出現率(2026-07-27ヒロ決定)。バトルタワーだけSTYLESのratesで差し替える。
+const BASE_RATES={coin:50,diamond:10,card:10,battle:15,event:5,warp:5,shop:5};
 function rollType(){
-  const r=Math.random()*100;                 // コイン50/ダイヤ10/カード10/バトル15/イベント5/ワープ5/ショップ5
-  if(r<50) return 'coin';
-  if(r<60) return 'diamond';
-  if(r<70) return 'card';
-  if(r<85) return 'battle';
-  if(r<90) return 'event';
-  if(r<95) return 'warp';
+  const R=(G.style&&G.style.rates)||BASE_RATES;
+  let r=Math.random()*100;
+  for(const k of ['coin','diamond','card','battle','event','warp']){ r-=R[k]; if(r<0) return k; }
   return 'shop';
+}
+// 🔴特殊塔のマス置き換え(2026-07-31ヒロ指定)。抽選直後に1マスずつ変換する。
+//   ゴールド=カード/ショップ→コインとダイヤ(カード入手が激減)
+//   カード=コイン/ダイヤ→カード(ショップはあるがお金がない)
+//   トリック=カード→ワープ・コイン/ダイヤ→「？」
+//   ※安全網が後から作るコイン(逃げ道)やドラゴン手前のカードはこの関数を通らない＝詰み対策は不変。
+function styleAdjustType(t){
+  const mod=G.style&&G.style.mod; if(!mod) return t;
+  if(mod==='gold'){ if(t==='card'||t==='shop') return Math.random()<0.75?'coin':'diamond'; }
+  else if(mod==='card'){ if(t==='coin'||t==='diamond') return 'card'; }
+  else if(mod==='trick'){ if(t==='card') return 'warp'; if(t==='coin'||t==='diamond') return 'event'; }
+  return t;
 }
 // 敵の強さ＝到達した「階」で決まる（ヒロ確定・2026-07-28）
 //   〜19階=3まで / 〜29階=4まで / 〜49階=5まで / 〜69階=6まで / 〜99階=7まで / 100階〜=8(ドラゴン)も出る
@@ -602,6 +620,7 @@ function enemyHPFor(f){
   return rand(2,cap);
 }
 function makeNode(idc,f,lanes,l,type,total){
+  if(type!=='start'&&type!=='goal') type=styleAdjustType(type);   // 特殊塔の置き換え
   if(lanes===1 && type==='battle') type='coin';   // 1本道に敵を置かない
   const n={id:'n'+idc,floor:f,lane:l,laneCount:lanes,type,next:[],enemyHP:0};
   if(type==='battle') n.enemyHP=enemyHPFor(f);
