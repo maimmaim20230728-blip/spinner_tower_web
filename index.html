@@ -459,7 +459,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -527,7 +527,7 @@ const CARDS={
   s_free:{r:'S',kind:'passive',freemove:true},
   s_sec:{r:'S',kind:'passive',security:10},
   plus12:{r:'S',kind:'active',plus:12},
-  food_set:{r:'S',kind:'active',food:100,solo:true},
+  food_set:{r:'S',kind:'active',food:200,solo:true},   // 🔴回復量は2026-07-31に全部2倍(ヒロ指定)
   candy:{r:'S',kind:'passive',candyHalf:true,solo:true},
   // A
   a_roulette:{r:'A',kind:'passive',roulette:[1,10]},
@@ -539,7 +539,7 @@ const CARDS={
   shop_a:{r:'A',kind:'active',shop:5},
   free:{r:'A',kind:'active',free:true},
   phantom:{r:'A',kind:'active',phantom:true},
-  food_l:{r:'A',kind:'active',food:50,solo:true},
+  food_l:{r:'A',kind:'active',food:100,solo:true},
   // B
   b_roulette:{r:'B',kind:'passive',roulette:[1,8]},
   b_plus:{r:'B',kind:'passive',plus:3},
@@ -551,7 +551,7 @@ const CARDS={
   stop6:{r:'B',kind:'active',stop:6},
   stop5:{r:'B',kind:'active',stop:5},
   stop4:{r:'B',kind:'active',stop:4},
-  food_m:{r:'B',kind:'active',food:25,solo:true},
+  food_m:{r:'B',kind:'active',food:50,solo:true},
   // 変身カード：使うと他のどれかのカードに変わる（カードマスの通常抽選で手に入る・2026-07-30ヒロ依頼）
   b_morph:{r:'B',kind:'active',morph:true},
   // C
@@ -563,13 +563,15 @@ const CARDS={
   stop3:{r:'C',kind:'active',stop:3},
   stop2:{r:'C',kind:'active',stop:2},
   stop1:{r:'C',kind:'active',stop:1},
-  food_s:{r:'C',kind:'active',food:10,solo:true},
+  food_s:{r:'C',kind:'active',food:20,solo:true},
 };
 const KEYS_BY_R={S:[],A:[],B:[],C:[]};
 for(const k in CARDS) KEYS_BY_R[CARDS[k].r].push(k);
 function randomCardKey(){
   const r=Math.random()*100; const rar = r<10?'S':r<30?'A':r<60?'B':'C';
-  let pool=KEYS_BY_R[rar]; if(G.mode!=='solo') pool=pool.filter(k=>!CARDS[k].solo);
+  // 🔴ソロ＝守る相手がいないのでセキュリティ(落とし物ガード)は出さない(2026-07-31ヒロ指定)。
+  //   その分だけ食料や他のカードが出やすくなる。他モード＝食料はソロ専用なので出さない。
+  const pool = KEYS_BY_R[rar].filter(k => G.mode==='solo' ? !CARDS[k].security : !CARDS[k].solo);
   return pick(pool);
 }
 // 🔴12種類まで／同じカードは9枚まで
@@ -584,7 +586,7 @@ function drawCard(p,n=1){ for(let i=0;i<n;i++) addCard(p,randomCardKey()); }
 function morphPick(p){
   for(let t=0;t<40;t++){ const k=randomCardKey(); if(k!=='b_morph' && canAddCard(p,k)) return k; }
   const pool=Object.keys(CARDS).filter(k=>k!=='b_morph'
-    && (G.mode==='solo' || !CARDS[k].solo) && canAddCard(p,k));
+    && (G.mode==='solo' ? !CARDS[k].security : !CARDS[k].solo) && canAddCard(p,k));
   return pool.length? pick(pool) : null;
 }
 // パッシブ集計
@@ -1422,8 +1424,10 @@ async function doEvent(p){
     evs.push(async()=>await evSummon(p));
     evs.push(async()=>await evDragonTrial(p));
   }
-  if(solo){ evs.push(()=>{ const h=rand(5,30); p.hp=Math.min(p.hpMax,p.hp+h); return T('evFood',{n:h}); });
-    evs.push(()=>{ const h=rand(5,30); p.hp-=h; return T('evFoodBad',{n:h}); }); }
+  // 🔴「？」の食べ物は ±10〜100（2026-07-31ヒロ指定・ギャンブル性を上げる）。
+  //   わるい方は一撃でリタイアになりうる＝そこが賭けどころ。死亡判定はtakeTurnの最後で拾う。
+  if(solo){ evs.push(()=>{ const h=rand(10,100); p.hp=Math.min(p.hpMax,p.hp+h); return T('evFood',{n:h}); });
+    evs.push(()=>{ const h=rand(10,100); p.hp-=h; return T('evFoodBad',{n:h}); }); }
   const r=pick(evs); const out=await r(); msg(`${p.name}：${out}`); render(); await sleep(700);
 }
 function shuffleArr(a){ for(let i=a.length-1;i>0;i--){ const j=rand(0,i); const t=a[i]; a[i]=a[j]; a[j]=t; } return a; }
