@@ -324,6 +324,7 @@
   /* 🔴強敵(HP5以上=64×64のドット絵)は大きく見せる。弱い敵と同じ大きさでは迫力が出ない（2026-07-30ヒロ指摘） */
   #enemyShow.big svg{width:150px; height:150px;}
   #enemyShow.boss svg{width:184px; height:184px;}
+  #enemyShow.mega svg{width:228px; height:228px;}   /* HP10 巨大ドラゴン */
   /* 🔴登場演出のあとは上に寄せて、戦闘が終わるまで大きいまま出しっぱなしにする（ヒロ依頼2026-07-30）。
      操作は下のルーレット側なので、上に寄せておけばぶつからない。 */
   /* 上端だと高すぎたので、中央よりすこし上に置く（2026-07-30ヒロ指摘） */
@@ -459,7 +460,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.4';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -484,8 +485,11 @@ function applyLang(){
 }
 const cardName=k=>T('cn_'+k), cardDesc=k=>T('cd_'+k);
 
+// 🔴HP10=巨大ドラゴン(ソロ無限の200階から出るだけの特別枠・2026-07-31ヒロ指定)。
+//   絵はドラゴンと同じものを一回り大きく出す(showEnemyでhp10→スプライト8を借りる)。
 const ENEMIES={2:{k:'enemy2',e:'🟢'},3:{k:'enemy3',e:'🐛'},4:{k:'enemy4',e:'🐤'},
-  5:{k:'enemy5',e:'🦊'},6:{k:'enemy6',e:'🐻'},7:{k:'enemy7',e:'🦅'},8:{k:'enemy8',e:'🐉'}};
+  5:{k:'enemy5',e:'🦊'},6:{k:'enemy6',e:'🐻'},7:{k:'enemy7',e:'🦅'},8:{k:'enemy8',e:'🐉'},
+  10:{k:'enemy10',e:'🐉'}};
 const enemyName=hp=>ENEMIES[hp]?T(ENEMIES[hp].k):T('enemyUnknown');
 
 // 塔のスキン。bgmキーは塔ごとの曲（audio.js側で作り分け）
@@ -627,6 +631,14 @@ function styleAdjustType(t){
 //   〜19階=3まで / 〜29階=4まで / 〜49階=5まで / 〜69階=6まで / 〜99階=7まで / 100階〜=8(ドラゴン)も出る
 //   🔴130階以降は「5以上」が70%の確率で出る
 function enemyHPFor(f){
+  // 🔴200階から上（ソロ無限しか到達しない領域・2026-07-31ヒロ指定）
+  //   ・HP4以下は出さない ・HP10の巨大ドラゴンが現れる
+  if(f>=200 && G.mode==='solo'){
+    const r=Math.random();
+    if(r<0.12) return 10;          // 巨大ドラゴン
+    if(r<0.32) return 8;           // ドラゴン
+    return rand(5,7);
+  }
   const cap = f<=19?3 : f<=29?4 : f<=49?5 : f<=69?6 : f<=99?7 : 8;
   if(f>=130) return Math.random()<0.70 ? rand(5,cap) : rand(2,4);
   return rand(2,cap);
@@ -1021,19 +1033,24 @@ function aiEndgamePrep(p){
   const si=p.cards.findIndex(k=>CARDS[k].stop===D); if(si>=0){ p.turn.stop=D; p.turn.usedActive=true; removeCard(p,si); return; }
   const fi=p.cards.findIndex(k=>CARDS[k].free); if(fi>=0){ p.turn.free=true; p.turn.usedActive=true; removeCard(p,fi); } }
 function aiFreeDist(p,raw){ const D=G.board.numFloors-G.board.nodes[p.node].floor; return (D>=1&&D<=raw)?D:raw; }
-// 🔴フリームーブの行き先＝「まうえ」と「左右のとなり」だけ。斜めへは飛べない(2026-07-31ヒロ指定)。
-//   まうえ＝次の階のうち、見た目のX位置(レーン割合)がいちばん近いマス。レーン数が違う階では
-//   ぴったり真上が無いことがあるので、同率(±0.02)なら両方を候補にする(どちらも選べないと詰むため)。
-//   左右＝同じ階の「となりのレーン」だけ(人間のみ・AIは従来どおり上方向のみ)。
+// 🔴フリームーブ＝「上と横に"も"動ける」（2026-07-31ヒロ訂正。“上と横にしか動けない”ではない）。
+//   ①もともとの分岐(n.next)はそのまま全部選べる＝分岐で斜めに行ける所は今までどおり行ける。
+//   ②それに加えて「まうえ」(次の階のうち見た目のX位置がいちばん近いマス。同率±0.02なら両方)と
+//     「左右のとなりのマス」(同じ階のlane±1)へも行ける。
+//   ③分岐でない所へ斜めに飛ぶことはできない＝足すのは真上と横だけ。
+//   AIは横移動を使わない(上方向のみ)。
 function freemoveNexts(p,n){
+  const out=n.next.slice();                        // ①もとの分岐は温存（斜めの分岐先もそのまま）
   const myX=laneFrac(n.lane,n.laneCount);
   const up=(G.board.floors[n.floor+1]||[]).map(id=>{
     const m=G.board.nodes[id]; return {id, d:Math.abs(laneFrac(m.lane,m.laneCount)-myX)}; });
   const min=up.reduce((a,e)=>Math.min(a,e.d),Infinity);
-  let out=up.filter(e=>e.d<=min+0.02).map(e=>e.id);
+  up.filter(e=>e.d<=min+0.02).forEach(e=>{ if(out.indexOf(e.id)<0) out.push(e.id); });   // ②まうえ
   if(!p.isAI){
-    out=out.concat((G.board.floors[n.floor]||[]).filter(id=>{
-      const m=G.board.nodes[id]; return Math.abs(m.lane-n.lane)===1; }));
+    (G.board.floors[n.floor]||[]).forEach(id=>{                                          // ②よこ
+      const m=G.board.nodes[id];
+      if(Math.abs(m.lane-n.lane)===1 && out.indexOf(id)<0) out.push(id);
+    });
   }
   return out;
 }
@@ -1051,7 +1068,8 @@ async function freeWalk(p,steps,ctx){
     if(!nexts.length) break;
     const opts={candidates:nexts.slice(), hintMsg:T('freeTapHint')};
     if(s>0){ opts.candidates.push(p.node); opts.selfStop=p.node; }   // 2歩目からは「ここでとまる」も選べる
-    const chosen=await waitFor('branch',opts);
+    // 🔴選ぶものが1つしかない＝分岐も横道も無い一本道。いちいちタップさせない(2026-07-31ヒロ指摘)
+    const chosen = opts.candidates.length===1 ? opts.candidates[0] : await waitFor('branch',opts);
     if(chosen===p.node) break;                                        // もう一回タップ＝確定
     const tn=G.board.nodes[chosen];
     p.node=chosen; p.path.push(chosen); AU('sfx','move');
@@ -1213,11 +1231,11 @@ function battleLoot(p,hp){ const strong=hp>=5,r=rand(0,2);
 // 🔴戦闘が終わるまで消さない（ヒロ依頼2026-07-30）。登場から約1秒で上に寄せ、hideEnemy()で片付ける。
 function showEnemy(hp){
   hideEnemy();
-  const sp=(window.ENEMY_SPRITES||{})[hp];
+  const sp=(window.ENEMY_SPRITES||{})[hp===10?8:hp];   // 巨大ドラゴンはドラゴンの絵を借りる
   const en=ENEMIES[hp]||{e:'⚔️'};
   const box=document.createElement('div'); box.id='enemyShow';
-  // HP5以上は64×64の描き込みがあるので大きく、HP8のドラゴンはさらに大きく出す
-  if(hp>=8) box.classList.add('boss'); else if(hp>=5) box.classList.add('big');
+  // HP5以上は64×64の描き込みがあるので大きく、HP8のドラゴンはさらに大きく、HP10はもう一回り大きく出す
+  if(hp>=10) box.classList.add('mega'); else if(hp>=8) box.classList.add('boss'); else if(hp>=5) box.classList.add('big');
   box.innerHTML=`<div class="ebox">${sp?sp.svg:`<div style="font-size:72px">${en.e}</div>`}
     <div class="ename">${enemyName(hp)}</div><div class="ehp">${T('enemyPower',{n:hp})}</div></div>`;
   $('#app').appendChild(box);
@@ -1392,7 +1410,8 @@ function openShop(p,opt){ return new Promise(resolve=>{
 async function doEvent(p){
   banner(T('evBanner'),'var(--event)'); await sleep(280);
   const solo=G.mode==='solo'; const evs=[];
-  evs.push(()=>{ const opp=G.players.filter(o=>o!==p&&!o.finished); let cnt=0;
+  // 🔴つむじ風はソロでは出さない（相手がいないので必ず「だれも来なかった」＝死にイベントだった・2026-07-31）
+  if(!solo) evs.push(()=>{ const opp=G.players.filter(o=>o!==p&&!o.finished); let cnt=0;
     opp.forEach(o=>{ if(moveItemTo(p,o)) cnt++; }); return cnt? T('evWind',{n:cnt}) : T('evWindNone'); });
   evs.push(()=>{ const n=rand(3,7); drawCard(p,n); return T('evCards',{n}); });
   evs.push(async()=>{ await openShop(p,{buyback:true,sellMult:3}); return T('evBuyback'); });
