@@ -86,13 +86,17 @@
   .node.pick{cursor:pointer; border:4px solid #22c55e; animation:pulse 1.1s infinite; z-index:5;
     transform:scale(1.06); box-shadow:0 0 0 3px rgba(34,197,94,.28), 0 3px 8px rgba(20,60,35,.3);}
   .node.pick::before{content:''; position:absolute; inset:-16px; border-radius:26px;}  /* 指で押しやすいよう当たり判定を広げる */
+  /* フリーストップ：いま立っているマス＝もう一回タップで「とまる」。金色で見分ける */
+  .node.pick.pickstop{border-color:#f5c542;}
   .node.pick .stepbadge{position:absolute; top:-11px; right:-11px; min-width:19px; height:19px; padding:0 4px;
     border-radius:10px; background:#22c55e; color:#fff; font-size:11px; font-weight:900;
     display:flex; align-items:center; justify-content:center; border:2px solid #fff; z-index:2;}
   @keyframes pulse{0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.28), 0 3px 8px rgba(20,60,35,.3);}
     50%{box-shadow:0 0 0 11px rgba(34,197,94,0), 0 3px 8px rgba(20,60,35,.3);}}
   /* コマ。人数が多いと見分けづらいので一回り大きくした（2026-07-30ヒロ指摘） */
-  .tok{position:absolute; width:28px; height:28px; margin-left:-14px; border-radius:50%; border:2px solid #fff;
+  /* 🔴pointer-events:none必須＝フリーストップの「いまのマスをもう一回タップ」で、自分のコマが
+     タップを吸ってマスに届かなくなるのを防ぐ(コマ自体にクリック操作はない・2026-07-31) */
+  .tok{pointer-events:none; position:absolute; width:28px; height:28px; margin-left:-14px; border-radius:50%; border:2px solid #fff;
     box-shadow:0 1px 3px rgba(0,0,0,.35); z-index:6; display:flex; align-items:center; justify-content:center;
     color:#fff; font-size:13px; font-weight:800; transition:left .18s, bottom .18s;}
   /* 目立たせるコマ（ひとりで遊ぶ時は自分・みんなでの時は今の番の人だけ）＝さらに一回り大きく、ゆっくり点滅 */
@@ -101,6 +105,12 @@
   @keyframes tokBlink{0%,100%{opacity:1; box-shadow:0 0 0 0 rgba(255,255,255,.9), 0 2px 6px rgba(0,0,0,.4);}
     50%{opacity:.55; box-shadow:0 0 0 7px rgba(255,255,255,0), 0 2px 6px rgba(0,0,0,.4);}}
   @media (prefers-reduced-motion:reduce){ .tok.mine{animation:none;} }
+  /* 🔴名前の先頭2文字が全角(カタカナ等)だと丸からはみ出る→自動で字を小さく詰める(2026-07-31ヒロ指摘) */
+  .tok.wide2{font-size:10px; letter-spacing:-1.5px;}
+  .tok.mine.wide2{font-size:12px; letter-spacing:-1px;}
+  /* AIのコマはタップで性格を確認できる。分岐えらびの最中はマスのタップを邪魔しない */
+  .tok.ai{pointer-events:auto; cursor:pointer;}
+  #app.branching .tok.ai{pointer-events:none;}
 
   #ctrl{flex:0 0 auto; background:var(--card); border-top:1px solid var(--line); padding:8px 10px 10px;}
   #msg{min-height:34px; font-size:13px; color:var(--sub); font-weight:700; text-align:center; margin-bottom:6px;
@@ -449,7 +459,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -480,18 +490,18 @@ const enemyName=hp=>ENEMIES[hp]?T(ENEMIES[hp].k):T('enemyUnknown');
 
 // 塔のスキン。bgmキーは塔ごとの曲（audio.js側で作り分け）
 const STYLES=[
-  {name:'石の塔',brick:'#9aa2a8',mortar:'#6f767c',cap:'#c4cace',shape:'tower',bgm:'tower_stone'},
-  {name:'レンガの塔',brick:'#b46a4a',mortar:'#7f4a34',cap:'#d98f6e',shape:'tower',bgm:'tower_brick'},
-  {name:'苔むす古塔',brick:'#7f9a68',mortar:'#566f46',cap:'#a6c088',shape:'tower',bgm:'tower_moss'},
-  {name:'砂の遺跡',brick:'#d8b877',mortar:'#b2955c',cap:'#ecd6a0',shape:'pyramid',bgm:'tower_sand'},
-  {name:'蒼氷の塔',brick:'#8fc6dd',mortar:'#5f97b0',cap:'#c3e6f2',shape:'tower',bgm:'tower_ice'},
+  {name:'石の塔',brick:'#9aa2a8',mortar:'#6f767c',cap:'#c4cace',shape:'tower',bgm:'tower_stone',tw:'tw_stone',ticon:'🪨'},
+  {name:'レンガの塔',brick:'#b46a4a',mortar:'#7f4a34',cap:'#d98f6e',shape:'tower',bgm:'tower_brick',tw:'tw_brick',ticon:'🧱'},
+  {name:'苔むす古塔',brick:'#7f9a68',mortar:'#566f46',cap:'#a6c088',shape:'tower',bgm:'tower_moss',tw:'tw_moss',ticon:'🌿'},
+  {name:'砂の遺跡',brick:'#d8b877',mortar:'#b2955c',cap:'#ecd6a0',shape:'pyramid',bgm:'tower_sand',tw:'tw_sand',ticon:'🏜️'},
+  {name:'蒼氷の塔',brick:'#8fc6dd',mortar:'#5f97b0',cap:'#c3e6f2',shape:'tower',bgm:'tower_ice',tw:'tw_ice',ticon:'❄️'},
   // 🔴特殊塔4種(2026-07-31ヒロ指定)。mod=マスの置き換え・rates=出現率の差し替え。
   //   置き換えは抽選直後(makeNode)に行う＝ソロ無限の継ぎ足しにも自動で効き、
   //   詰み対策の安全網(escape/ドラゴン手前カード/safeRoute)はその後に走るので保たれる。
-  {name:'ゴールドタワー',brick:'#d2a93c',mortar:'#9c7a24',cap:'#f2d97a',shape:'tower',bgm:'tower_gold',mod:'gold'},
-  {name:'カードタワー',brick:'#9a6fc4',mortar:'#6b4a8e',cap:'#c9aae8',shape:'tower',bgm:'tower_card',mod:'card'},
-  {name:'トリックタワー',brick:'#c76fa8',mortar:'#94477a',cap:'#eaa3cf',shape:'tower',bgm:'tower_trick',mod:'trick'},
-  {name:'バトルタワー',brick:'#a6493f',mortar:'#6e2b24',cap:'#cf7263',shape:'tower',bgm:'tower_battle',
+  {name:'ゴールドタワー',brick:'#d2a93c',mortar:'#9c7a24',cap:'#f2d97a',shape:'tower',bgm:'tower_gold',mod:'gold',tw:'tw_gold',ticon:'🪙'},
+  {name:'カードタワー',brick:'#9a6fc4',mortar:'#6b4a8e',cap:'#c9aae8',shape:'tower',bgm:'tower_card',mod:'card',tw:'tw_card',ticon:'🃏'},
+  {name:'トリックタワー',brick:'#c76fa8',mortar:'#94477a',cap:'#eaa3cf',shape:'tower',bgm:'tower_trick',mod:'trick',tw:'tw_trick',ticon:'🎪'},
+  {name:'バトルタワー',brick:'#a6493f',mortar:'#6e2b24',cap:'#cf7263',shape:'tower',bgm:'tower_battle',tw:'tw_battle',ticon:'⚔️',
     rates:{coin:26,diamond:6,card:8,battle:45,event:5,warp:5,shop:5}},
 ];
 const CHEST_SVG=`<svg viewBox="0 0 52 42" width="46" height="37" xmlns="http://www.w3.org/2000/svg">
@@ -788,7 +798,8 @@ function render(){
       `<span>${n.type==='battle'&&ENEMIES[n.enemyHP]?ENEMIES[n.enemyHP].e:(TILE_ICON[n.type]||'·')}</span>`;
     // 候補には「何マス進むか」を出す（敵で強制ストップの所は少ない数になる）
     const badge = pickable && G.wait.stepsOf && G.wait.stepsOf[id] ? `<span class="stepbadge">${G.wait.stepsOf[id]}</span>` : '';
-    html+=`<div class="node type-${n.type}${pickable?' pick':''}" data-id="${id}" style="left:${x}px;bottom:${bt}px">${inner}${n.type==='battle'?`<span class="hp">HP${n.enemyHP}</span>`:''}${badge}</div>`;
+    const pickstop = pickable && G.wait.selfStop===id;   // フリーストップ：いまのマス＝もう一回タップで確定
+    html+=`<div class="node type-${n.type}${pickable?' pick':''}${pickstop?' pickstop':''}" data-id="${id}" style="left:${x}px;bottom:${bt}px">${inner}${n.type==='battle'?`<span class="hp">HP${n.enemyHP}</span>`:''}${badge}</div>`;
   }
   // 🔴目立たせるコマの決め方（2026-07-30ヒロ指定）
   //   みんなで＝画面を全員で見るので、常時点滅は邪魔。今の番の人だけを、その時だけ大きく点滅させる。
@@ -798,7 +809,9 @@ function render(){
     const here=G.players.filter(q=>!q.finished&&q.node===p.node); const k=here.indexOf(p),off=(k-(here.length-1)/2)*17;
     const iconStyle=p.icon?`;background-image:url(${p.icon})`:'';
     const mine=(p===spot)?' mine':'';
-    html+=`<div class="tok${p.icon?' hasicon':''}${mine}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${p.mark}</div>`; });
+    // 🔴全角2文字(カタカナ等)は28pxの丸からはみ出るので、wide2で字を小さくする
+    const wide=(!p.icon && [...String(p.mark)].length>=2 && /[^ -ÿ]/.test(p.mark))?' wide2':'';
+    html+=`<div class="tok${p.icon?' hasicon':''}${mine}${p.isAI?' ai':''}${wide}" data-pid="${p.id}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${p.mark}</div>`; });
   boardEl.innerHTML=`<svg id="tower"></svg><svg id="links"></svg>`+html;
   drawTower(); drawLinks(); bindNodes(); updateHUD();
 }
@@ -859,7 +872,14 @@ function bindNodes(){ boardEl.querySelectorAll('.node').forEach(el=>el.onclick=(
   if(!(G.wait&&G.wait.type==='branch')) return;
   if(G.wait.candidates.includes(id)) resolveWait(id);
   else { msg(T('pickGreen')); AU('sfx','button'); }   // 押せないマスを押した時も知らせる（無反応にしない）
-}); }
+});
+  // 🔴AIのコマをタップ→性格「だけ」を知らせる(2026-07-31ヒロ依頼)。分岐えらび中はCSSで無効化される
+  boardEl.querySelectorAll('.tok.ai').forEach(el=>el.onclick=e=>{ e.stopPropagation();
+    const p=G.players.filter(x=>String(x.id)===el.dataset.pid)[0]; if(!p) return;
+    const ps=personaOf(p); AU('sfx','button');
+    msg(ps.icon+' '+p.name+'：'+T(pKeyOf(ps.key)));
+  });
+}
 function autoScroll(p){ const b=G.board,H=boardHeight(),n=b.nodes[p.node];
   scrollEl.scrollTo({top:Math.max(0,H-(nodeBottom(n)+NODE/2)-scrollEl.clientHeight*0.58),behavior:'smooth'}); }
 // 画面に映すプレイヤー：ふだんは自分。みんなでモードは「今の番の人」（順番はルーレットで決まるので固定できない）
@@ -881,7 +901,9 @@ function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.b
 function waitFor(type,extra={}){ return new Promise(res=>{ G.wait={type,resolve:res,...extra}; onWaitChange(); }); }
 function resolveWait(v){ const w=G.wait; G.wait=null; onWaitChange(); if(w) w.resolve(v); }
 function onWaitChange(){ const w=G.wait; $('#spinBtn').disabled=!(w&&w.type==='spin');
-  if(w&&w.type==='branch'){ msg(w.dest?T('destMsg',{n:w.steps}):T('branchMsg')); render();
+  // 分岐えらびの最中はAIコマのタップを止める(マスのタップを吸わせない)
+  $('#app').classList.toggle('branching', !!(w&&w.type==='branch'));
+  if(w&&w.type==='branch'){ msg(w.hintMsg||(w.dest?T('destMsg',{n:w.steps}):T('branchMsg'))); render();
     if(w.dest) scrollToShow(w.candidates); } renderHand(); }
 // 候補が画面の外に出ないよう、いちばん上の候補が見える位置までスクロール
 function scrollToShow(ids){
@@ -924,6 +946,7 @@ const PERSONAS=[
   {key:'wild', icon:'🌀', enemy: 0.9, flat:-0.5, foe: 0.2, reward:0.9, skill:1,   odd:3,   chaos:0.50}  // 気まぐれ：ワープや「？」に好んで飛び込む
 ];
 function personaOf(p){ return PERSONAS.filter(x=>x.key===p.persona)[0] || PERSONAS[2]; }
+function pKeyOf(k){ return 'p'+k.charAt(0).toUpperCase()+k.slice(1); }   // 'aggr'→'pAggr'(i18nキー)
 // AIたちに性格を配る。3タイプを並べてシャッフル＝偏りにくい（1〜2人のときは純粋にランダム）
 function assignPersonas(list){
   const bag=[];
@@ -976,11 +999,53 @@ function aiEndgamePrep(p){
   if(!high && Math.random()<(tech?0.08:0.4)) return;   // normalは終盤準備を忘れがち（技巧派はほぼ忘れない）
   const si=p.cards.findIndex(k=>CARDS[k].stop===D); if(si>=0){ p.turn.stop=D; p.turn.usedActive=true; removeCard(p,si); return; }
   const fi=p.cards.findIndex(k=>CARDS[k].free); if(fi>=0){ p.turn.free=true; p.turn.usedActive=true; removeCard(p,fi); } }
-function chooseDistance(p,max){ return new Promise(res=>{ const ov=document.createElement('div'); ov.className='overlay';
-  let b=''; for(let i=1;i<=max;i++) b+=`<button class="dbtn" data-d="${i}">${i}</button>`;
-  ov.innerHTML=`<div class="sheet"><h2>${T('freeChoose')}</h2><div class="dgrid">${b}</div><p class="tiny">${T('freeHint')}</p></div>`;
-  ov.querySelectorAll('.dbtn').forEach(x=>x.onclick=()=>{ ov.remove(); res(+x.dataset.d); }); $('#app').appendChild(ov); }); }
 function aiFreeDist(p,raw){ const D=G.board.numFloors-G.board.nodes[p.node].floor; return (D>=1&&D<=raw)?D:raw; }
+// 🔴フリームーブの行き先＝「まうえ」と「左右のとなり」だけ。斜めへは飛べない(2026-07-31ヒロ指定)。
+//   まうえ＝次の階のうち、見た目のX位置(レーン割合)がいちばん近いマス。レーン数が違う階では
+//   ぴったり真上が無いことがあるので、同率(±0.02)なら両方を候補にする(どちらも選べないと詰むため)。
+//   左右＝同じ階の「となりのレーン」だけ(人間のみ・AIは従来どおり上方向のみ)。
+function freemoveNexts(p,n){
+  const myX=laneFrac(n.lane,n.laneCount);
+  const up=(G.board.floors[n.floor+1]||[]).map(id=>{
+    const m=G.board.nodes[id]; return {id, d:Math.abs(laneFrac(m.lane,m.laneCount)-myX)}; });
+  const min=up.reduce((a,e)=>Math.min(a,e.d),Infinity);
+  let out=up.filter(e=>e.d<=min+0.02).map(e=>e.id);
+  if(!p.isAI){
+    out=out.concat((G.board.floors[n.floor]||[]).filter(id=>{
+      const m=G.board.nodes[id]; return Math.abs(m.lane-n.lane)===1; }));
+  }
+  return out;
+}
+// 🔴フリーストップ(2026-07-31ヒロ指定)：先に「何マス進む？」と数を聞くのをやめた。
+//   あと何マスで止まりたいマスに着くかは、数えないと分からず価値が薄いため。
+//   出目の内で1マスずつタップで進み、いま立っているマスをもう一回タップすると そこで確定(とまる)。
+//   出目を使い切る・敵に当たる・ゴールに入る、でも確定。最初の1歩の前には確定できない(最低1マスは進む)。
+async function freeWalk(p,steps,ctx){
+  showRemain(steps);
+  for(let s=0;s<steps;s++){
+    const n=G.board.nodes[p.node];
+    if(n.type==='goal') break;
+    if(G.mode==='solo') maybeExtendSolo(p);
+    const nexts=(ctx.freemove||hasFreemove(p)) ? freemoveNexts(p,n) : n.next.slice();
+    if(!nexts.length) break;
+    const opts={candidates:nexts.slice(), hintMsg:T('freeTapHint')};
+    if(s>0){ opts.candidates.push(p.node); opts.selfStop=p.node; }   // 2歩目からは「ここでとまる」も選べる
+    const chosen=await waitFor('branch',opts);
+    if(chosen===p.node) break;                                        // もう一回タップ＝確定
+    const tn=G.board.nodes[chosen];
+    p.node=chosen; p.path.push(chosen); AU('sfx','move');
+    showRemain(steps-s-1);
+    if(G.mode==='solo'){ p.hpAcc+=hasCandy(p)?0.5:1; while(p.hpAcc>=1){p.hp--;p.hpAcc--;} if(p.hp<=0){ render(); return 'retire'; } }
+    render(); autoScroll(p); await sleep(mvDelay(150));
+    if(G.mode==='solo'){
+      const fl=tn.floor;
+      for(const m of TITLE_MILESTONES){ if(fl>=m && !p.milestones.includes(m)){ p.milestones.push(m); await titleCelebration(m); } }
+    }
+    if(tn.type==='goal') break;                                       // フリーはぴったり扱いでゴールに入れる(従来仕様)
+    if(!ctx.phantom && tn.type==='battle') break;                     // 敵は強制ストップ
+  }
+  resetRoulette();
+}
 
 // 🔴出た目の分だけ先まで見て「行ける終着マス」を全部だす（分岐のたびに止めない・ヒロ案2026-07-28）
 //   途中で敵に当たったらそこで強制ストップ＝そこが終着。ゴールは通り過ぎられない（ぴったりでなければはね返る）。
@@ -1024,7 +1089,10 @@ async function walkPath(p,path,remainFrom){
 }
 async function movePlayer(p,rawSteps,ctx){
   ctx=ctx||{}; let steps=rawSteps;
-  if(ctx.free) steps = p.isAI? aiFreeDist(p,rawSteps) : await chooseDistance(p,rawSteps);
+  if(ctx.free){
+    if(p.isAI) steps=aiFreeDist(p,rawSteps);
+    else return await freeWalk(p,rawSteps,ctx);   // 🔴人は1マスずつタップ+もう一回タップで確定(2026-07-31)
+  }
   // 人が動かす時（フリームーブ以外）は、行きたい終着マスを1回タップするだけで進む
   if(!p.isAI && !(ctx.freemove||hasFreemove(p)) && steps>0){
     if(G.mode==='solo') maybeExtendSolo(p);           // 先に盤を伸ばしてから候補を出す
@@ -1049,8 +1117,7 @@ async function movePlayer(p,rawSteps,ctx){
     showRemain(steps-s);
     let nexts;
     if(ctx.freemove||hasFreemove(p)){
-      nexts = (G.board.floors[n.floor+1]||[]).slice();                                   // 分岐無視で次の階の任意レーン
-      if(!p.isAI) nexts = nexts.concat((G.board.floors[n.floor]||[]).filter(id=>id!==p.node)); // 真横(同じ階の別レーン)も選べる
+      nexts = freemoveNexts(p,n);   // 🔴まうえ+左右のとなりだけ。斜めへは飛べない(2026-07-31ヒロ指定)
     } else nexts = n.next.slice();
     if(!nexts.length) break;
     const last=(s===steps-1), goalId=nexts.find(id=>G.board.nodes[id].type==='goal');
@@ -1544,7 +1611,11 @@ async function takeTurn(p){
   // 🔴ストップは番をまたいで残さない。残すと、対戦バトルで受け手側になったときに
   //   その人の前の番の出目指定が効いてしまう（p.turnは各自の前の番のものが残るため）。
   G.players.forEach(x=>{ if(x.turn){ x.turn.stop=null; x.turn.rouletteLimit=null; x.turn.plusAdd=0; } });
-  p.turn={}; banner(T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name}),p.color); autoScroll(p); renderHand(); await sleep(300);
+  p.turn={};
+  // 🔴AIの番は性格も一緒に見せる(2026-07-31ヒロ依頼)＝「なぜその動きをするか」が伝わる
+  let bt=T(!p.isAI&&G.mode!=='friends'?'turnOfYou':'turnOf',{name:p.name});
+  if(p.isAI){ const ps=personaOf(p); bt+='　'+ps.icon+T(pKeyOf(ps.key)); }
+  banner(bt,p.color); autoScroll(p); renderHand(); await sleep(300);
   if(p.isAI) aiEndgamePrep(p);
   const {val}=await doSpin(p,{label:T('moveLbl')});
   // 🔴ストップはこの番のバトルにも効かせる（2026-07-30ヒロ指定＝移動でなくルーレットの出目を決めるカードだから）。
@@ -1677,6 +1748,7 @@ function resumeGame(s){
   $('#titleScreen').style.display='none'; $('#modeConfig').style.display='none';
   $('#stamwrap').style.display=G.mode==='solo'?'block':'none';
   AU('playBGM', fieldBGM());
+  updateTowerLabel(true);
   render(); autoScroll(G.me);
   msg(T('resumed'));
   gameLoop();
@@ -1829,6 +1901,7 @@ function startGame(){
   G.turnNo=0; G.hidden=[]; G.goalCount=0;             // 隠れた敵・ゴール人数をリセット
   G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
   AU('playBGM', (G.style&&G.style.bgm)||G.mode);      // 🔴BGMは塔の種類ごと
+  updateTowerLabel(true);                              // どの塔にいるかをHUDに出す
   render(); scrollEl.scrollTo({top:scrollEl.scrollHeight});
   msg(T(G.mode==='solo'?'msgStartSolo':'msgStartRace'));
   (async()=>{ await decideOrder(); gameLoop(); })();   // 先にルーレットでじゅんばんを決める
@@ -1886,6 +1959,11 @@ $('#langClose').onclick=()=>{ $('#langPanel').style.display='none'; AU('sfx','bu
 function mvDelay(base){ return Math.max(20, base/(G.set.moveSpd||1)); }
 function rlDelay(base){ return Math.max(12, base/(G.set.roulSpd||1)); }
 
+// 🔴いまどの塔にいるかをHUD左上(ふだんはロゴの場所)に出す(2026-07-31ヒロ依頼)
+function updateTowerLabel(on){
+  const el=document.querySelector('#hud .title'); if(!el) return;
+  el.textContent = (on && G.style && G.style.tw) ? (G.style.ticon||'')+' '+T(G.style.tw) : 'スゴロクタワー';
+}
 // ============ タイトル画面・遷移 ============
 let audioBooted=false;
 // 🔴ブラウザの自動再生制限があるので、音は「最初の操作」で解禁する。
@@ -1908,6 +1986,7 @@ window.addEventListener('keydown', firstGesture);
 function showTitle(){
   $('#titleScreen').style.display='flex'; $('#modeConfig').style.display='none';
   G.running=false;
+  updateTowerLabel(false);
   showTitleTexts();
   if(audioBooted) AU('playBGM','title');
 }
