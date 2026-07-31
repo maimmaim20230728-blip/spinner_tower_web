@@ -449,7 +449,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.5.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.5.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -1869,7 +1869,23 @@ function rlDelay(base){ return Math.max(12, base/(G.set.roulSpd||1)); }
 
 // ============ タイトル画面・遷移 ============
 let audioBooted=false;
-function audioBoot(){ if(audioBooted){return;} audioBooted=true; AU('init'); AU('setBgmVol',+G.set.bgm); AU('setSfxVol',+G.set.sfx); }
+// 🔴ブラウザの自動再生制限があるので、音は「最初の操作」で解禁する。
+//   init だけでは音源をつないだだけで無音のまま＝ここで曲も鳴らし始める（2026-07-31修正）。
+//   これが無いと、タイトル・塔えらび・難易度えらびが「はじめる」を押すまでずっと無音だった。
+function audioBoot(){
+  if(audioBooted){ return; }
+  audioBooted=true;
+  AU('init'); AU('setBgmVol',+G.set.bgm); AU('setSfxVol',+G.set.sfx);
+  if(!G.running) AU('playBGM','title');   // ゲーム中に解禁された時は塔のBGMを邪魔しない
+}
+// 画面のどこを触っても解禁されるようにする（特定のボタンを押すまで無音、を防ぐ）
+function firstGesture(){
+  audioBoot();
+  window.removeEventListener('pointerdown', firstGesture);
+  window.removeEventListener('keydown', firstGesture);
+}
+window.addEventListener('pointerdown', firstGesture);
+window.addEventListener('keydown', firstGesture);
 function showTitle(){
   $('#titleScreen').style.display='flex'; $('#modeConfig').style.display='none';
   G.running=false;
