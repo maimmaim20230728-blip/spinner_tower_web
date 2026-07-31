@@ -297,6 +297,13 @@
     display:flex; align-items:center; justify-content:center; font-size:13px; flex:0 0 auto;}
   .stagebtn .sinfo{flex:1;}
   .stagebtn .sdesc{font-size:calc(11px*var(--fs)); color:var(--sub); font-weight:700;}
+  /* 中断データの一覧：モードが一目で分かる色帯（対戦=アクセント/みんなで=青/ソロ=紫）+ 絵文字アイコン */
+  .stagebtn.save-campaign{border-left:6px solid var(--accent);}
+  .stagebtn.save-friends{border-left:6px solid #2f7fc4;}
+  .stagebtn.save-solo{border-left:6px solid #8b5cf6;}
+  .stagebtn.save-campaign .snum{background:var(--accent);}
+  .stagebtn.save-friends .snum{background:#2f7fc4;}
+  .stagebtn.save-solo .snum{background:#8b5cf6;}
   .stagebtn.cleared{border-color:var(--accent);}
   .stagebtn.cleared .schk{color:var(--accent-d); font-size:16px;}
   .stagebtn.locked{opacity:.45;}
@@ -460,7 +467,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.6';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.7';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -1770,7 +1777,7 @@ async function gameLoop(){ G.running=true;
 // ============ 中断とつづき（2026-07-30ヒロ依頼・後半が長いのでセーブが要る） ============
 // 🔴仕様: 中断データは3つまで。**再開したらその枠は消す**（同じ場面を何度もやり直せないようにするため）。
 //   保存するのは盤面と全員の状態だけ。関数やDOMは入れない（G.waitは入れない）。
-const SAVE_KEY='gt_saves', SAVE_MAX=3;
+const SAVE_KEY='gt_saves', SAVE_MAX=5;   // 🔴5枠に拡張(2026-08-01ヒロ指定・対戦とソロを並行して持てるように)
 function loadSaves(){
   try{ const a=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]'); return Array.isArray(a)?a.slice(0,SAVE_MAX):[]; }
   catch(e){ return []; }
@@ -1800,30 +1807,56 @@ function saveLabel(s){
   const stagePart = s.mode==='campaign' ? '　'+T('st'+(s.stage||0)) : '';
   return modeName + stagePart + '　' + T('floorsUnit',{n:floor});
 }
+// 保存日時（数字だけの表記＝全言語共通で読める）
+function fmtSaveTs(ts){
+  const d=new Date(ts||Date.now()), p=n=>(n<10?'0':'')+n;
+  return (d.getMonth()+1)+'/'+d.getDate()+' '+p(d.getHours())+':'+p(d.getMinutes());
+}
 function suspendGame(){
   if(!G.running || !G.board){ return; }
+  const snap=serializeGame();
   const list=loadSaves();
-  list.unshift(serializeGame());
+  list.unshift(snap);
   if(!writeSaves(list)){ msg(T('saveFull')); return; }
+  // 🔴書けたことを読み直して確かめる（「保存したのに無い」の実機報告があったため。
+  //   容量オーバー等で書けていなければ、ゲームを続けたままエラーを出す＝黙って失われない）
+  const back=loadSaves();
+  if(!back.length || back[0].ts!==snap.ts){ msg(T('saveFull')); return; }
   G.running=false; G.wait=null;
   $('#setPanel').style.display='none';
   AU('sfx','button');
   showTitle();
   banner(T('saved'),'var(--blue)');
 }
+// 🔴一覧はモードが一目で分かるように＝アイコン+左の色帯+日時+ソロはHPも(2026-08-01ヒロ依頼)
 function renderSaveList(){
   const list=loadSaves(), el=$('#saveList');
   if(!list.length){ el.innerHTML=`<p class="tiny">${T('saveNone')}</p>`; return; }
-  el.innerHTML=list.map((s,i)=>`<button class="stagebtn" data-i="${i}">
-    <span class="snum">${i+1}</span>
-    <span class="sinfo">${saveLabel(s)}<div class="sdesc">${T('savePlayers',{n:s.players.length})}</div></span></button>`).join('');
+  const ICON={campaign:'⚔️', friends:'👥', solo:'🏔️'};
+  el.innerHTML=list.map((s,i)=>{
+    const me=s.players[s.meIdx]||s.players[0]||{};
+    const hpPart=s.mode==='solo' ? '　HP'+(me.hp!=null?me.hp:'?') : '';
+    return `<button class="stagebtn save-${s.mode||'solo'}" data-i="${i}">
+    <span class="snum">${ICON[s.mode]||'📖'}</span>
+    <span class="sinfo">${saveLabel(s)}${hpPart}
+      <div class="sdesc">${T('savePlayers',{n:s.players.length})}　🕒${fmtSaveTs(s.ts)}</div></span></button>`;
+  }).join('');
   el.querySelectorAll('.stagebtn').forEach(b=>b.onclick=()=>{
     AU('sfx','button');
     const idx=+b.dataset.i, all=loadSaves(), s=all[idx];
     if(!s) return;
-    all.splice(idx,1); writeSaves(all);   // 🔴読み込んだ枠はここで消す（やり直し防止）
     $('#savePanel').style.display='none';
-    resumeGame(s);
+    // 🔴先に消さない。再開に成功した時だけ枠を消す（途中で失敗すると枠ごと失われていた危険の除去）。
+    //   成功したら即消す＝「読み込んだらその枠は使い切り」のリセマラ対策(ヒロ仕様)は保ったまま。
+    try{
+      resumeGame(s);
+      all.splice(idx,1); writeSaves(all);
+      msg(T('saveUsed'));
+    }catch(e){
+      G.running=false;
+      showTitle();
+      banner(T('saveLoadFail'),'var(--battle)');
+    }
   });
 }
 function resumeGame(s){
