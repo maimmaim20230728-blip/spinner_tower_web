@@ -460,7 +460,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.5';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.6';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -1830,6 +1830,13 @@ function resumeGame(s){
   G.mode=s.mode; G.stage=s.stage||0; G.style=s.style; G.board=s.board;
   G.players=s.players; G.turn=s.turn||0; G.turnNo=s.turnNo||0; G.hidden=s.hidden||[];
   G.goalCount=s.goals||0;
+  // 🔴セーブから戻したG.styleは複製＝STYLES本体と別物なので、名前でつなぎ直す(ゾーン切替の比較が効くように)
+  { const i=STYLES.findIndex(x=>s.style && x.name===s.style.name); if(i>=0) G.style=STYLES[i]; }
+  // 🔴v2.6.1以前のソロのセーブにはゾーンが無い→全体を1ゾーンとして扱う(旧Play版vc22の中断データ互換)
+  if(G.mode==='solo' && G.board && !(G.board.zones&&G.board.zones.length)){
+    const si=Math.max(0,STYLES.findIndex(x=>s.style && x.name===s.style.name));
+    G.board.zones=[{from:0,to:G.board.numFloors,si}];
+  }
   G.players.forEach(p=>{ p.turn=p.turn||{}; });
   G.me=G.players[s.meIdx] || G.players.find(p=>!p.isAI) || G.players[0];
   if(s.friends) G.friends=s.friends;
@@ -2081,7 +2088,11 @@ function showTitle(){
   showTitleTexts();
   if(audioBooted) AU('playBGM','title');
 }
-document.querySelectorAll('.modebtn').forEach(b=>b.onclick=()=>{
+// 🔴data-modeを持つボタンだけに配線する（2026-07-31修正・v2.4.0からのバグ）。
+//   「前回の続きから」(#resumeBtn)も class="modebtn" のため、'.modebtn'一括だとここに巻き込まれ、
+//   この一括代入がソース上で#resumeBtn個別の配線より後に走る＝正しい再開処理が上書きされて
+//   「つづきからを押してもモード設定が開くだけ＝再開できない・データが無いように見える」になっていた。
+document.querySelectorAll('.modebtn[data-mode]').forEach(b=>b.onclick=()=>{
   audioBoot(); AU('sfx','button');
   G.mode=b.dataset.mode;
   $('#mcTitle').textContent = T(G.mode==='campaign'?'mcCampaign': G.mode==='friends'?'mcFriends':'mcSolo');
