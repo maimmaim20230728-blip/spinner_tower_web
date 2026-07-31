@@ -460,7 +460,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.4';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.5';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -1223,6 +1223,20 @@ async function resolveLanding(p,depth=0){
 function gainOne(p){ const r=rand(0,2); if(r===0){p.coins+=rand(2,4);return '🪙';} if(r===1){p.diamonds+=1;return '💎';} drawCard(p); return T('gainCard1'); }
 
 // ============ バトル ============
+// 🔴巨大ドラゴン(HP10)を倒したときの追加ドロップ（2026-07-31ヒロ指定）。
+//   食料系5枚のうち1枚が必ず出る。どれが出るかはカードと同じレア度の重み(S10/A20/B30/C40)。
+//   S枠は食料セットとキャンディの2枚で分け合う＝各5%。手札に入らない時だけコインに替える。
+const FOOD_KEYS=['food_set','candy','food_l','food_m','food_s'];
+function rollFoodKey(){
+  const r=Math.random()*100, rar = r<10?'S':r<30?'A':r<60?'B':'C';
+  const pool=FOOD_KEYS.filter(k=>CARDS[k].r===rar);
+  return pool.length? pick(pool) : 'food_s';
+}
+function megaFoodDrop(p){
+  const k=rollFoodKey();
+  if(canAddCard(p,k)){ addCard(p,k); return '　'+T('megaDrop',{name:cardName(k)}); }
+  p.coins+=10; return '　'+T('megaDropFull');
+}
 function battleLoot(p,hp){ const strong=hp>=5,r=rand(0,2);
   if(r===0){ const d=strong?rand(1,2):1; p.diamonds+=d; return `💎+${d}`; }
   if(r===1){ const c=strong?rand(5,15):rand(2,5); p.coins+=c; return `🪙+${c}`; }
@@ -1257,8 +1271,10 @@ async function enemyBattle(p,node){
     : '';
   const {val}=await doSpin(p,{label:T('fightLbl'),hint});
   if(val>=node.enemyHP){ const loot=battleLoot(p,node.enemyHP); AU('sfx','win');
+    // 🔴巨大ドラゴン(HP10)は通常の強敵報酬に加えて、必ず食料系も1枚落とす（2026-07-31ヒロ指定）
+    const mega = node.enemyHP>=10 ? megaFoodDrop(p) : '';
     // 🔴倒した敵は隠れるだけ＝次のターンにまた出てくる（ヒロ仕様2026-07-28）
-    msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot}));
+    msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot})+mega);
     node.type='cleared'; node.hpHidden=node.enemyHP; node.enemyHP=0;
     (G.hidden=G.hidden||[]).push({id:node.id, turn:G.turnNo||0}); }
   else{ const back=node.enemyHP-val; retreat(p,back); if(G.mode==='solo') p.hp-=back; AU('sfx','lose');
