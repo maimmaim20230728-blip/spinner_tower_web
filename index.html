@@ -459,7 +459,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -816,7 +816,13 @@ function render(){
   drawTower(); drawLinks(); bindNodes(); updateHUD();
 }
 function drawTower(){
-  const b=G.board,W=boardW(),H=boardHeight(),st=G.style||STYLES[0],s=$('#tower'); if(!s)return;
+  const b=G.board,W=boardW(),H=boardHeight(),s=$('#tower'); if(!s)return;
+  // 🔴ソロ無限は継ぎ足しごとに塔の種類が変わる（2026-07-31ヒロ依頼）＝ゾーンごとに帯で塗り分ける。
+  //   他のモードはゾーン1つ＝従来どおり1色。
+  const zones=(b.zones&&b.zones.length)?b.zones
+    :[{from:0,to:b.numFloors,si:Math.max(0,STYLES.indexOf(G.style||STYLES[0]))}];
+  const stOf=z=>STYLES[z.si]||G.style||STYLES[0];
+  const topSt=stOf(zones[zones.length-1]), botSt=stOf(zones[0]);
   s.setAttribute('width',W); s.setAttribute('height',H); s.style.width=W+'px'; s.style.height=H+'px';
   const nf=b.numFloors,cx=W/2,yc=f=>H-(f*FLOOR_H+PAD_B+NODE/2),Lp=[],Rp=[];
   for(let f=0;f<=nf;f++){ const hw=towerWidthAt(f/nf)*W/2,y=yc(f); Lp.push([cx-hw,y]); Rp.push([cx+hw,y]); }
@@ -825,15 +831,28 @@ function drawTower(){
   const pts=[[cx-baseHW,gy+10]].concat(Lp).concat([Rp[nf]]).concat(Rp.slice().reverse()).concat([[cx+baseHW,gy+10]]);
   const d='M'+pts.map(p=>p[0].toFixed(1)+','+p[1].toFixed(1)).join(' L')+' Z';
   const tlx=Lp[nf][0],trx=Rp[nf][0],ty=Lp[nf][1]; let top='';
-  if(st.shape==='pyramid') top=`<polygon points="${tlx-2},${ty} ${trx+2},${ty} ${cx},${(ty-30).toFixed(1)}" fill="${st.cap}" stroke="${st.mortar}" stroke-width="3"/>`;
-  else { const n=5,step=(trx-tlx)/n; for(let i=0;i<n;i++) if(i%2===0) top+=`<rect x="${(tlx+i*step).toFixed(1)}" y="${(ty-18).toFixed(1)}" width="${(step+0.6).toFixed(1)}" height="20" fill="${st.cap}" stroke="${st.mortar}" stroke-width="2"/>`; }
-  s.innerHTML=`<defs><pattern id="brk" width="46" height="28" patternUnits="userSpaceOnUse">
-    <rect width="46" height="28" fill="${st.mortar}"/><rect x="1" y="1" width="44" height="12" rx="2" fill="${st.brick}"/>
-    <rect x="-22" y="15" width="44" height="12" rx="2" fill="${st.brick}"/><rect x="24" y="15" width="44" height="12" rx="2" fill="${st.brick}"/></pattern>
+  if(topSt.shape==='pyramid') top=`<polygon points="${tlx-2},${ty} ${trx+2},${ty} ${cx},${(ty-30).toFixed(1)}" fill="${topSt.cap}" stroke="${topSt.mortar}" stroke-width="3"/>`;
+  else { const n=5,step=(trx-tlx)/n; for(let i=0;i<n;i++) if(i%2===0) top+=`<rect x="${(tlx+i*step).toFixed(1)}" y="${(ty-18).toFixed(1)}" width="${(step+0.6).toFixed(1)}" height="20" fill="${topSt.cap}" stroke="${topSt.mortar}" stroke-width="2"/>`; }
+  // ゾーンの境目＝そのゾーンの最初の階の半マス下。帯はここで切り替える（すき間なく敷き詰まる）
+  const boundY=i=>yc(zones[i].from)+FLOOR_H/2;
+  let defs='',bands='',seams='';
+  zones.forEach((z,i)=>{
+    const st=stOf(z);
+    const yTop=(i===zones.length-1)?0:boundY(i+1);
+    const yBot=(i===0)?H:boundY(i);
+    defs+=`<pattern id="brk${i}" width="46" height="28" patternUnits="userSpaceOnUse">
+      <rect width="46" height="28" fill="${st.mortar}"/><rect x="1" y="1" width="44" height="12" rx="2" fill="${st.brick}"/>
+      <rect x="-22" y="15" width="44" height="12" rx="2" fill="${st.brick}"/><rect x="24" y="15" width="44" height="12" rx="2" fill="${st.brick}"/></pattern>
+      <clipPath id="zc${i}"><rect x="0" y="${yTop.toFixed(1)}" width="${W}" height="${Math.max(0,yBot-yTop).toFixed(1)}"/></clipPath>`;
+    bands+=`<g clip-path="url(#zc${i})"><path d="${d}" fill="url(#brk${i})" stroke="${st.mortar}" stroke-width="4"/></g>`;
+    if(i>0){ const y=boundY(i), hw=towerWidthAt(zones[i].from/nf)*W/2;   // 境目に飾りの帯を1本
+      seams+=`<rect x="${(cx-hw-3).toFixed(1)}" y="${(y-4).toFixed(1)}" width="${((hw+3)*2).toFixed(1)}" height="8" rx="2" fill="${st.cap}" stroke="${st.mortar}" stroke-width="2"/>`; }
+  });
+  s.innerHTML=`<defs>${defs}
     <linearGradient id="shd" x1="0" y1="0" x2="1" y2="0"><stop offset="0" stop-color="rgba(0,0,0,.2)"/><stop offset=".5" stop-color="rgba(0,0,0,0)"/><stop offset="1" stop-color="rgba(0,0,0,.16)"/></linearGradient></defs>
-    ${groundSvg(W,H,gy,cx,baseHW,st)}
-    <path d="${d}" fill="url(#brk)" stroke="${st.mortar}" stroke-width="4"/><path d="${d}" fill="url(#shd)"/>${top}
-    ${basePlinth(cx,baseHW,gy,st)}`;
+    ${groundSvg(W,H,gy,cx,baseHW,botSt)}
+    ${bands}<path d="${d}" fill="url(#shd)"/>${seams}${top}
+    ${basePlinth(cx,baseHW,gy,botSt)}`;
 }
 // 🔴ふもと：下から「草の地面（スタートはここ）→ 石段 → 塔の土台」。さあ上るぞ、という並びにする
 function groundSvg(W,H,gy,cx,baseHW,st){
@@ -1548,9 +1567,40 @@ async function warpTile(p,node){
 }
 
 // ============ ソロ無限：継ぎ足し ============
+// 🔴ソロ無限：継ぎ足すたびに塔の種類が変わる（2026-07-31ヒロ依頼）。
+//   砂の遺跡(ピラミッド)だけは除外＝途中で塔の形が変わると盤の幅もコマの位置も破綻するため
+//   （towerWidthAtとnodeXが形に追従するので、縦に混ぜられない）。ヒロ了承済み。
+function soloStyleIndex(exceptSi){
+  const cand=[]; STYLES.forEach((s,i)=>{ if(s.shape!=='pyramid' && i!==exceptSi) cand.push(i); });
+  return pick(cand);
+}
+function zoneAt(f){
+  const zs=(G.board&&G.board.zones)||null; if(!zs||!zs.length) return null;
+  for(let i=zs.length-1;i>=0;i--) if(f>=zs[i].from) return zs[i];
+  return zs[0];
+}
+// いま立っている階のゾーンに合わせて、塔の見た目・BGM・HUDの塔名を切り替える
+function soloZoneCheck(p){
+  if(G.mode!=='solo'||!G.board||!G.board.zones) return;
+  const n=G.board.nodes[p.node]; if(!n) return;
+  const z=zoneAt(n.floor); if(!z) return;
+  const st=STYLES[z.si]; if(!st||st===G.style) return;
+  G.style=st;
+  AU('playBGM',st.bgm); updateTowerLabel(true);
+  banner((st.ticon||'')+' '+T('zoneEnter',{name:T(st.tw)}),'var(--accent)');
+  render();
+}
 function maybeExtendSolo(p){
+  soloZoneCheck(p);                              // 進むたびに、今いるゾーンへ合わせる
   const b=G.board,top=b.numFloors; if(b.nodes[p.node].floor<top-10) return; const add=16;
+  // 🔴継ぎ足す区間だけ G.style を次の塔にしてから生成＝その区間にマスの割合と置き換えが効く。
+  //   見た目とBGMは「今いるゾーン」のままにしたいので、生成が終わったら戻す。
+  const last=(b.zones&&b.zones.length)?b.zones[b.zones.length-1].si:null;
+  const si=soloStyleIndex(last), prev=G.style;
+  G.style=STYLES[si];
   extendFloors(b, top+add, top+add, false);      // 分岐/合流のルールは本編と同じ
+  G.style=prev;
+  (b.zones=b.zones||[]).push({from:top+1,to:top+add,si});
   b.numFloors=top+add; ensureBattleEscape(b); placeCardsBeforeDragons(b); render(); autoScroll(p);
 }
 
@@ -1893,11 +1943,13 @@ function makePlayers(){ const arr=[];
   return arr; }
 function startGame(){
   $('#titleScreen').style.display='none'; $('#stamwrap').style.display=G.mode==='solo'?'block':'none'; G.style=pick(STYLES);
+  if(G.mode==='solo') G.style=STYLES[soloStyleIndex(null)];   // ソロは砂の遺跡を出さない（上で形が変わるため）
   let numFloors,hasGoal=true;
   if(G.mode==='solo'){ numFloors=30; hasGoal=false; }
   else if(G.mode==='friends'){ numFloors=G.friends.height||45; }
   else numFloors=STAGES[G.stage||0].floors;
   G.board=genBoard(numFloors,{hasGoal}); G.players=makePlayers(); G.turn=0;
+  if(G.mode==='solo') G.board.zones=[{from:0,to:numFloors,si:STYLES.indexOf(G.style)}];   // 最初のゾーン
   G.turnNo=0; G.hidden=[]; G.goalCount=0;             // 隠れた敵・ゴール人数をリセット
   G.me=G.players.find(p=>!p.isAI)||G.players[0];      // HUDに映す自分（順番が入れ替わっても固定）
   AU('playBGM', (G.style&&G.style.bgm)||G.mode);      // 🔴BGMは塔の種類ごと
