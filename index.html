@@ -52,6 +52,7 @@
   #stamover{position:absolute; left:0; top:0; height:100%; width:0; z-index:2; background:linear-gradient(90deg,#f5c542,#f6d97a); box-shadow:0 0 6px rgba(245,197,66,.8); transition:width .25s, opacity .25s;}
   #stamwrap .lbl{display:flex; justify-content:space-between; align-items:center; font-size:12px; color:var(--sub); font-weight:700; margin-bottom:3px;}
   #hpnum{font-size:13px; font-weight:800; color:var(--green-d);}
+  #boostNum{font-size:12px; font-weight:800; color:#0a8a9c; margin-right:8px;}   /* 減り半分の のこりマス */
 
   #boardScroll{flex:1 1 auto; overflow-y:auto; overflow-x:hidden; position:relative;
     background:linear-gradient(180deg,#bfe6f5 0%,#d9f0ea 55%,#e9f6ec 100%);}
@@ -353,7 +354,7 @@
     <button class="iconbtn" id="gearBtn2" style="width:36px;height:36px;font-size:16px" aria-label="せってい">⚙️</button>
   </div>
   <div id="turnbar" data-i18n="welcome">タワーへようこそ</div>
-  <div id="stamwrap"><div class="lbl"><span data-i18n="staminaLbl">たいりょく（食料をとらないとリタイア）</span><b id="hpnum">100</b></div><div id="stambar"><div id="stamfill"></div><div id="stamover"></div></div></div>
+  <div id="stamwrap"><div class="lbl"><span data-i18n="staminaLbl">たいりょく（食料をとらないとリタイア）</span><b id="boostNum" style="display:none"></b><b id="hpnum">100</b></div><div id="stambar"><div id="stamfill"></div><div id="stamover"></div></div></div>
   <div id="boardScroll"><div id="board"><svg id="tower"></svg><svg id="links"></svg></div></div>
   <div id="ctrl">
     <div id="msg"></div>
@@ -467,7 +468,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.7';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.8';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -538,7 +539,8 @@ const CARDS={
   s_free:{r:'S',kind:'passive',freemove:true},
   s_sec:{r:'S',kind:'passive',security:10},
   plus12:{r:'S',kind:'active',plus:12},
-  food_set:{r:'S',kind:'active',food:200,solo:true},   // 🔴回復量は2026-07-31に全部2倍(ヒロ指定)
+  // 🔴回復量は2026-08-01に再調整(ヒロ指定)=小50/中100/大200/セット200+100マス減り半分(boost)
+  food_set:{r:'S',kind:'active',food:200,boost:100,solo:true},
   candy:{r:'S',kind:'passive',candyHalf:true,solo:true},
   // A
   a_roulette:{r:'A',kind:'passive',roulette:[1,10]},
@@ -550,7 +552,7 @@ const CARDS={
   shop_a:{r:'A',kind:'active',shop:5},
   free:{r:'A',kind:'active',free:true},
   phantom:{r:'A',kind:'active',phantom:true},
-  food_l:{r:'A',kind:'active',food:100,solo:true},
+  food_l:{r:'A',kind:'active',food:200,solo:true},
   // B
   b_roulette:{r:'B',kind:'passive',roulette:[1,8]},
   b_plus:{r:'B',kind:'passive',plus:3},
@@ -562,7 +564,7 @@ const CARDS={
   stop6:{r:'B',kind:'active',stop:6},
   stop5:{r:'B',kind:'active',stop:5},
   stop4:{r:'B',kind:'active',stop:4},
-  food_m:{r:'B',kind:'active',food:50,solo:true},
+  food_m:{r:'B',kind:'active',food:100,solo:true},
   // 変身カード：使うと他のどれかのカードに変わる（カードマスの通常抽選で手に入る・2026-07-30ヒロ依頼）
   b_morph:{r:'B',kind:'active',morph:true},
   // C
@@ -574,7 +576,7 @@ const CARDS={
   stop3:{r:'C',kind:'active',stop:3},
   stop2:{r:'C',kind:'active',stop:2},
   stop1:{r:'C',kind:'active',stop:1},
-  food_s:{r:'C',kind:'active',food:20,solo:true},
+  food_s:{r:'C',kind:'active',food:50,solo:true},
 };
 const KEYS_BY_R={S:[],A:[],B:[],C:[]};
 for(const k in CARDS) KEYS_BY_R[CARDS[k].r].push(k);
@@ -609,6 +611,17 @@ function rangeOf(p){ let lo=1,hi=7; for(const k of p.cards){ const c=CARDS[k]; i
 function plusOf(p){ let m=0; for(const k of p.cards){ const c=CARDS[k]; if(c.kind==='passive' && c.plus>m) m=c.plus; } return m; }
 function hasFreemove(p){ return p.cards.some(k=>CARDS[k].freemove && CARDS[k].kind==='passive'); }
 function hasCandy(p){ return p.cards.some(k=>CARDS[k].candyHalf); }
+// 🔴ソロの体力消費＝1マスにつき1。キャンディ(持っている間ずっと)か、食料セットの効果が
+//   残っている間(p.boost=のこりマス数)は半分になる(2026-08-01ヒロ指定)。
+//   同じ式が移動処理3か所に散っていたのでここに集約した。'retire'を返したら力尽き。
+function soloStep(p){
+  if(G.mode!=='solo') return null;
+  const half = hasCandy(p) || (p.boost||0)>0;
+  if((p.boost||0)>0) p.boost--;
+  p.hpAcc += half ? 0.5 : 1;
+  while(p.hpAcc>=1){ p.hp--; p.hpAcc--; }
+  return p.hp<=0 ? 'retire' : null;
+}
 
 // ============ 状態 ============
 const G={mode:'campaign',diff:0,pcount:2,style:STYLES[0],board:null,players:[],turn:0,running:false,wait:null};
@@ -933,6 +946,9 @@ function updateHUD(){ const me=viewPlayer();
     const over=$('#stamover'); const ov=clamp(hp-100,0,100); over.style.width=ov+'%'; over.style.opacity=ov>0?1:0;
     const num=$('#hpnum'); num.textContent = hp>100 ? T('hpFull',{hp,n:hp-100}) : `${hp}`;
     num.style.color = hp<=20?'#e05353' : hp<=50?'#c67f16' : (hp>100?'#0a8a9c':'var(--green-d)');
+    // 🔴減りが半分になっている間は、あと何マス効くかを見せる（見えない効果にしない）
+    const bs=$('#boostNum');
+    if(bs){ const b=me.boost||0; bs.textContent = b>0 ? T('boostLeft',{n:b}) : ''; bs.style.display = b>0?'inline':'none'; }
   } }
 function msg(t){ $('#msg').textContent=t; }
 function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.background=c; }
@@ -1081,7 +1097,7 @@ async function freeWalk(p,steps,ctx){
     const tn=G.board.nodes[chosen];
     p.node=chosen; p.path.push(chosen); AU('sfx','move');
     showRemain(steps-s-1);
-    if(G.mode==='solo'){ p.hpAcc+=hasCandy(p)?0.5:1; while(p.hpAcc>=1){p.hp--;p.hpAcc--;} if(p.hp<=0){ render(); return 'retire'; } }
+    if(soloStep(p)==='retire'){ render(); return 'retire'; }
     render(); autoScroll(p); await sleep(mvDelay(150));
     if(G.mode==='solo'){
       const fl=tn.floor;
@@ -1124,7 +1140,7 @@ async function walkPath(p,path,remainFrom){
   for(const t of path){
     p.node=t; p.path.push(t); AU('sfx','move');
     showRemain(--left);
-    if(G.mode==='solo'){ p.hpAcc+=hasCandy(p)?0.5:1; while(p.hpAcc>=1){p.hp--;p.hpAcc--;} if(p.hp<=0){ render(); return 'retire'; } }
+    if(soloStep(p)==='retire'){ render(); return 'retire'; }
     render(); autoScroll(p); await sleep(mvDelay(170));
     if(G.mode==='solo'){
       const fl=G.board.nodes[p.node].floor;
@@ -1175,7 +1191,7 @@ async function movePlayer(p,rawSteps,ctx){
     }
     const target = nexts.length===1? nexts[0] : (p.isAI? aiChoose(p,nexts) : await waitFor('branch',{candidates:nexts}));
     p.node=target; p.path.push(target); AU('sfx','move');
-    if(G.mode==='solo'){ p.hpAcc+=hasCandy(p)?0.5:1; while(p.hpAcc>=1){p.hp--;p.hpAcc--;} if(p.hp<=0){render();return 'retire';} }
+    if(soloStep(p)==='retire'){ render(); return 'retire'; }
     render(); autoScroll(p); await sleep(mvDelay(170));
     // ソロ：50/100/200/500階の称号到達＝そのたびコングラチュレーション
     if(G.mode==='solo'){
@@ -1358,7 +1374,11 @@ async function useCard(p,i){
   else if(c.morph){ removeCard(p,i); const got=morphPick(p);
     if(got){ addCard(p,got); AU('sfx','card'); msg(T('useMorph',{card:cardName(got)})); }
     else { const co=rand(3,8); p.coins+=co; AU('sfx','coin'); msg(T('useMorphFull',{n:co})); } }
-  else if(c.food){ if(G.mode==='solo'){ p.hp=Math.min(p.hpMax,p.hp+c.food); msg(T('useFood',{n:c.food}));} removeCard(p,i); }
+  else if(c.food){ if(G.mode==='solo'){ p.hp=Math.min(p.hpMax,p.hp+c.food);
+      // 🔴食料セットは回復に加えて「このさきNマスは体力の減りが半分」(2026-08-01ヒロ指定)。重ねたら足し算
+      if(c.boost){ p.boost=(p.boost||0)+c.boost; msg(T('useFoodBoost',{n:c.food,m:c.boost})); }
+      else msg(T('useFood',{n:c.food}));
+    } removeCard(p,i); }
   else if(c.warp){ removeCard(p,i); await useWarpCard(p,c.warp); }
   else if(c.shop){ removeCard(p,i); await openShop(p,{cards:c.shop,buyback:true,exchange:true}); }
   renderHand(); updateHUD();
@@ -1955,7 +1975,7 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
 
 // ============ 開始 ============
 function newP(i,name,isAI,mark){ return {id:i,name,isAI,color:PLAYER_COLORS[i%4],mark:mark||'あ',node:'n0',path:['n0'],
-  coins:0,diamonds:0,cards:[],security:0,hp:0,hpMax:0,hpAcc:0,overshoots:0,milestones:[],finished:false,turn:{}}; }
+  coins:0,diamonds:0,cards:[],security:0,hp:0,hpMax:0,hpAcc:0,boost:0,overshoots:0,milestones:[],finished:false,turn:{}}; }
 // ============ キャンペーン14段ラダー（クリアで次を解放） ============
 // 🔴段の名前/説明は i18n（st0〜st13 / sd0〜sd13）
 const STAGES=[
