@@ -470,7 +470,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.1';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く

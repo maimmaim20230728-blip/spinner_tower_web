@@ -437,7 +437,10 @@
 
   // BGM定義（bpm・小節数・ステップ関数／dly,fb,wet はディレイの任意調整）
   var BGM = {
-    title:    { bpm: 92,  bars: 8, step: stepTitle },
+    // 🔴gain=曲ごとの音量倍率(既定1)。タイトルは静かな音色(sine/triangle中心・打点なし)で
+    //    ゲーム中の曲より小さく聞こえる、というヒロさんの指摘で1.35に(2026-08-08)。
+    //    測定上はほぼ中央値だったが、聞こえ方は音色と倍音で決まるため耳の判断を優先した。
+    title:    { bpm: 92,  bars: 8, step: stepTitle, gain: 1.35 },
     battle:   { bpm: 152, bars: 2, step: stepBattle, dly: 0.5, fb: 0.14, wet: 0.22 },
     duel:     { bpm: 138, bars: 2, step: stepDuel,   dly: 0.5, fb: 0.18, wet: 0.30 },
     campaign: { bpm: 122, bars: 4, step: stepCampaign },
@@ -459,8 +462,9 @@
   // トラックを作る（ディレイ付きのバスと専用スケジューラ）
   function makeTrack(key) {
     var cfg = BGM[key];
+    var vol = (cfg.gain == null) ? 1 : cfg.gain;   // 曲ごとの音量倍率
     var g = ctx.createGain();
-    g.gain.value = 1;
+    g.gain.value = vol;
     g.connect(bgmGain);
 
     // ゆるいディレイ（残響感／曲ごとに深さを変えられる）
@@ -474,7 +478,7 @@
     delay.connect(wet); wet.connect(g);
 
     return {
-      key: key, cfg: cfg, gain: g, delay: delay,
+      key: key, cfg: cfg, gain: g, delay: delay, vol: vol,
       step: 0,
       totalSteps: cfg.bars * 16,
       stepDur: 60 / cfg.bpm / 4,                  // 16分音符の秒数
@@ -496,7 +500,7 @@
   function startTrack(key) {
     var tr = makeTrack(key);
     tr.gain.gain.setValueAtTime(0.0001, ctx.currentTime);
-    tr.gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 0.3); // フェードイン
+    tr.gain.gain.linearRampToValueAtTime(tr.vol, ctx.currentTime + 0.3); // フェードイン（曲ごとの音量まで）
     tr.timer = setInterval(function () { tick(tr); }, TIMER_MS);
     tick(tr);
     track = tr;
