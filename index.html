@@ -470,12 +470,12 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.9';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
 // 🔴スタートは「階段の下の地面」。PAD_Bを小さくして草の上に置き、その上に石段→塔の土台と続く
-const FLOOR_H=96, NODE=46, PAD_B=16, GROUND=116, HAND_KINDS=12, SAME_MAX=9, SOLO_HP0=100, SOLO_HPMAX=200;
+const FLOOR_H=96, NODE=46, PAD_B=16, GROUND=116, HAND_KINDS=12, SAME_MAX=5, SOLO_HP0=100, SOLO_HPMAX=200;
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
@@ -1941,8 +1941,9 @@ function resumeGame(s){
 
 // ============ 終了・演出 ============
 // 称号（ヒロ確定・2026-07-28）：50/100/200/500階。到達のたびコングラチュレーション演出
-const TITLES=[[0,'title0'],[50,'title50'],[100,'title100'],[200,'title200'],[500,'title500']];
-const TITLE_MILESTONES=[50,100,200,500];
+const TITLES=[[0,'title0'],[50,'title50'],[100,'title100'],[200,'title200'],[500,'title500'],
+  [1000,'title1000']];   // 🔴1000階=タワーマスターレジェンド(2026-08-01ヒロ追加)
+const TITLE_MILESTONES=[50,100,200,500,1000];
 async function titleCelebration(floor){
   const name=titleFor(floor);
   AU('sfx','goal');
