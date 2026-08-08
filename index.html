@@ -333,6 +333,8 @@
   #enemyShow.big svg{width:150px; height:150px;}
   #enemyShow.boss svg{width:184px; height:184px;}
   #enemyShow.mega svg{width:228px; height:228px;}   /* HP10 巨大ドラゴン */
+  #enemyShow.titan svg{width:286px; height:286px;}  /* HP15 超巨大ドラゴン＝いちばん大きい */
+  #enemyShow.titan .ename{font-size:calc(19px*var(--fs));}
   /* 🔴登場演出のあとは上に寄せて、戦闘が終わるまで大きいまま出しっぱなしにする（ヒロ依頼2026-07-30）。
      操作は下のルーレット側なので、上に寄せておけばぶつからない。 */
   /* 上端だと高すぎたので、中央よりすこし上に置く（2026-07-30ヒロ指摘） */
@@ -468,7 +470,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.6.8';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.6.9';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -497,7 +499,7 @@ const cardName=k=>T('cn_'+k), cardDesc=k=>T('cd_'+k);
 //   絵はドラゴンと同じものを一回り大きく出す(showEnemyでhp10→スプライト8を借りる)。
 const ENEMIES={2:{k:'enemy2',e:'🟢'},3:{k:'enemy3',e:'🐛'},4:{k:'enemy4',e:'🐤'},
   5:{k:'enemy5',e:'🦊'},6:{k:'enemy6',e:'🐻'},7:{k:'enemy7',e:'🦅'},8:{k:'enemy8',e:'🐉'},
-  10:{k:'enemy10',e:'🐉'}};
+  10:{k:'enemy10',e:'🐉'},15:{k:'enemy15',e:'🐉'}};   // 15=超巨大ドラゴン(ラスボス格・ソロ300階以上)
 const enemyName=hp=>ENEMIES[hp]?T(ENEMIES[hp].k):T('enemyUnknown');
 
 // 塔のスキン。bgmキーは塔ごとの曲（audio.js側で作り分け）
@@ -776,15 +778,21 @@ function clearNearGoal(b, span=8){
 }
 // 敵ゼロの逃げ道を保証（分岐のキモ）
 // 🔴リンクは足さない（足すと合流が増えて「分岐したら7階は合流しない」が壊れる）。マスの種類だけ変える。
+// 逃げ道を作るとき、超巨大ドラゴン(HP15)のマスは最後の手段にする＝せっかく置いたラスボスを消さない
+function escapePick(b,ids){
+  const soft=ids.filter(id=>(b.nodes[id].enemyHP||0)<15);
+  return pick(soft.length? soft : ids);
+}
 function ensureBattleEscape(b){
   // 各階に敵でないマスを必ず1つ残す
-  b.floors.forEach(fl=>{ if(fl.length && fl.every(id=>b.nodes[id].type==='battle')){ const n=b.nodes[fl[0]]; n.type='coin'; n.enemyHP=0; } });
+  b.floors.forEach(fl=>{ if(fl.length && fl.every(id=>b.nodes[id].type==='battle')){
+    const n=b.nodes[escapePick(b,fl)]; n.type='coin'; n.enemyHP=0; } });
   const rev={}; for(const id in b.nodes) rev[id]=[];
   for(const id in b.nodes) b.nodes[id].next.forEach(x=>rev[x].push(id));
   for(const id in b.nodes){ const n=b.nodes[id];
     // 分岐なのに行き先が全部敵＝選ぶ意味がない。1つを敵なしにする
     if(n.next.length>=2 && n.next.every(x=>b.nodes[x].type==='battle')){
-      const t=b.nodes[pick(n.next)]; t.type='coin'; t.enemyHP=0;
+      const t=b.nodes[escapePick(b,n.next)]; t.type='coin'; t.enemyHP=0;
     }
   }
 }
@@ -1246,17 +1254,21 @@ async function resolveLanding(p,depth=0){
 function gainOne(p){ const r=rand(0,2); if(r===0){p.coins+=rand(2,4);return '🪙';} if(r===1){p.diamonds+=1;return '💎';} drawCard(p); return T('gainCard1'); }
 
 // ============ バトル ============
-// 🔴巨大ドラゴン(HP10)を倒したときの追加ドロップ（2026-07-31ヒロ指定）。
-//   食料系5枚のうち1枚が必ず出る。どれが出るかはカードと同じレア度の重み(S10/A20/B30/C40)。
-//   S枠は食料セットとキャンディの2枚で分け合う＝各5%。手札に入らない時だけコインに替える。
-const FOOD_KEYS=['food_set','candy','food_l','food_m','food_s'];
-function rollFoodKey(){
-  const r=Math.random()*100, rar = r<10?'S':r<30?'A':r<60?'B':'C';
-  const pool=FOOD_KEYS.filter(k=>CARDS[k].r===rar);
-  return pool.length? pick(pool) : 'food_s';
+// 🔴ドラゴン級を倒したときの食料の追加ドロップ（2026-08-01ヒロ再調整）。
+//   巨大ドラゴン(HP10)は小物中心＝後半に食料が余って簡単になりすぎるのを防ぐ。
+//   超巨大ドラゴン(HP15)だけが大物を落とす＝ラスボスを倒す価値をここに集約する。
+const MEGA_DROP={
+  10:[['food_s',70],['food_m',25],['food_l',5]],
+  15:[['food_m',50],['food_l',30],['food_set',10],['candy',10]]
+};
+function rollFoodKey(hp){
+  const tbl=MEGA_DROP[hp>=15?15:10];
+  let r=Math.random()*100;
+  for(const [k,w] of tbl){ r-=w; if(r<0) return k; }
+  return tbl[tbl.length-1][0];
 }
-function megaFoodDrop(p){
-  const k=rollFoodKey();
+function megaFoodDrop(p,hp){
+  const k=rollFoodKey(hp);
   if(canAddCard(p,k)){ addCard(p,k); return '　'+T('megaDrop',{name:cardName(k)}); }
   p.coins+=10; return '　'+T('megaDropFull');
 }
@@ -1268,11 +1280,12 @@ function battleLoot(p,hp){ const strong=hp>=5,r=rand(0,2);
 // 🔴戦闘が終わるまで消さない（ヒロ依頼2026-07-30）。登場から約1秒で上に寄せ、hideEnemy()で片付ける。
 function showEnemy(hp){
   hideEnemy();
-  const sp=(window.ENEMY_SPRITES||{})[hp===10?8:hp];   // 巨大ドラゴンはドラゴンの絵を借りる
+  const sp=(window.ENEMY_SPRITES||{})[(hp===10||hp===15)?8:hp];   // 巨大/超巨大はドラゴンの絵を借りる
   const en=ENEMIES[hp]||{e:'⚔️'};
   const box=document.createElement('div'); box.id='enemyShow';
-  // HP5以上は64×64の描き込みがあるので大きく、HP8のドラゴンはさらに大きく、HP10はもう一回り大きく出す
-  if(hp>=10) box.classList.add('mega'); else if(hp>=8) box.classList.add('boss'); else if(hp>=5) box.classList.add('big');
+  // HP5以上は64×64の描き込みがあるので大きく、8→10→15の順に一回りずつ大きく出す（15が最大）
+  if(hp>=15) box.classList.add('titan'); else if(hp>=10) box.classList.add('mega');
+  else if(hp>=8) box.classList.add('boss'); else if(hp>=5) box.classList.add('big');
   box.innerHTML=`<div class="ebox">${sp?sp.svg:`<div style="font-size:72px">${en.e}</div>`}
     <div class="ename">${enemyName(hp)}</div><div class="ehp">${T('enemyPower',{n:hp})}</div></div>`;
   $('#app').appendChild(box);
@@ -1294,8 +1307,8 @@ async function enemyBattle(p,node){
     : '';
   const {val}=await doSpin(p,{label:T('fightLbl'),hint});
   if(val>=node.enemyHP){ const loot=battleLoot(p,node.enemyHP); AU('sfx','win');
-    // 🔴巨大ドラゴン(HP10)は通常の強敵報酬に加えて、必ず食料系も1枚落とす（2026-07-31ヒロ指定）
-    const mega = node.enemyHP>=10 ? megaFoodDrop(p) : '';
+    // 🔴巨大(HP10)と超巨大(HP15)は通常の強敵報酬に加えて、必ず食料系も1枚落とす
+    const mega = node.enemyHP>=10 ? megaFoodDrop(p,node.enemyHP) : '';
     // 🔴倒した敵は隠れるだけ＝次のターンにまた出てくる（ヒロ仕様2026-07-28）
     msg(T(p.isAI?'battleWinA':'battleWinP',{name:p.name,ename,loot})+mega);
     node.type='cleared'; node.hpHidden=node.enemyHP; node.enemyHP=0;
@@ -1640,6 +1653,25 @@ function soloStyleIndex(exceptSi){
   const cand=[]; STYLES.forEach((s,i)=>{ if(s.shape!=='pyramid' && i!==exceptSi) cand.push(i); });
   return pick(cand);
 }
+// 🔴超巨大ドラゴン(HP15)＝ラスボス格。**300階以上で50階ごとに1体だけ**(2026-08-01ヒロ指定)。
+//   抽選(enemyHPFor)では出さない＝出現数を確実に守るため、階を生成した後にこの関数が1体だけ昇格させる。
+//   呼ぶ順番は ensureBattleEscape の後・placeCardsBeforeDragons の前
+//   （逃げ道づくりでボスが消されないように、かつボスの手前にカードが置かれるように）。
+const BOSS_FROM=300, BOSS_BAND=50;
+function placeGiantBoss(b, from, to){
+  b.bossBands = b.bossBands || {};
+  const first=Math.floor(Math.max(from,BOSS_FROM)/BOSS_BAND), last=Math.floor(to/BOSS_BAND);
+  for(let band=first; band<=last; band++){
+    if((band+1)*BOSS_BAND-1 < BOSS_FROM) continue;      // 300階より下の帯は対象外
+    if(b.bossBands[band]) continue;                      // その帯にはもう置いてある
+    const lo=Math.max(from, band*BOSS_BAND, BOSS_FROM), hi=Math.min(to, (band+1)*BOSS_BAND-1);
+    const cand=[];
+    for(let f=lo; f<=hi; f++) (b.floors[f]||[]).forEach(id=>{ if(b.nodes[id].type==='battle') cand.push(id); });
+    if(!cand.length) continue;                           // この区間に敵マスが無い＝次の継ぎ足しで置く
+    b.nodes[pick(cand)].enemyHP=15;
+    b.bossBands[band]=true;
+  }
+}
 function zoneAt(f){
   const zs=(G.board&&G.board.zones)||null; if(!zs||!zs.length) return null;
   for(let i=zs.length-1;i>=0;i--) if(f>=zs[i].from) return zs[i];
@@ -1667,7 +1699,11 @@ function maybeExtendSolo(p){
   extendFloors(b, top+add, top+add, false);      // 分岐/合流のルールは本編と同じ
   G.style=prev;
   (b.zones=b.zones||[]).push({from:top+1,to:top+add,si});
-  b.numFloors=top+add; ensureBattleEscape(b); placeCardsBeforeDragons(b); render(); autoScroll(p);
+  b.numFloors=top+add;
+  ensureBattleEscape(b);
+  placeGiantBoss(b, top+1, top+add);   // 🔴逃げ道づくりの後・カード配置の前に置く
+  placeCardsBeforeDragons(b);
+  render(); autoScroll(p);
 }
 
 // ============ 手札UI ============
