@@ -4,7 +4,7 @@
 
 **完全無料・広告なし・登録不要・オフラインOK**
 
-介護と支援の相談どころ「そよぎ」 https://soyogi.hp.peraichi.com/top
+介護と支援の相談どころ「そよぎ」 https://soudansoyogi.com/
 
 ## あそびかた
 - ルーレットを回して、出た数だけ塔をのぼる
