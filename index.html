@@ -348,6 +348,28 @@
   .ask-ov .ask-msg{color:var(--ink); font-weight:800; font-size:calc(16px*var(--fs)); line-height:1.5; margin:0 0 6px;}
   .ask-row{display:flex; gap:8px;}
   .ask-row .btn{flex:1;}
+  /* ===== はじめての あそびかた（初回の案内・2026-09-30）=====
+     アプリの枠(#app)ぜんぶをおおう。窓(26)・クリア演出(30)より手前、確かめの窓(32)より奥。
+     本文だけがスクロールし、「まえ／つぎ」は下の地の色の帯に置く（帯が透けて本文が見えない・最後の行が帯に隠れない） */
+  #guideOv{position:absolute; inset:0; z-index:31; display:flex; flex-direction:column; background:var(--paper); color:var(--ink);}
+  #guideOv .guide-scroll{flex:1 1 auto; min-height:0; overflow-y:auto; -webkit-overflow-scrolling:touch;
+    padding:calc(20px + env(safe-area-inset-top, 0px)) 18px 20px;}
+  #guideOv .guide-top{display:flex; justify-content:space-between; align-items:baseline; gap:12px;}
+  #guideOv .guide-title{margin:0; font-weight:800; font-size:calc(14px*var(--fs)); color:var(--accent-d);}
+  #guideOv .guide-step{margin:0; font-weight:800; font-size:calc(14px*var(--fs)); color:var(--sub); white-space:nowrap; unicode-bidi:isolate;}
+  #guideOv .guide-h{margin:12px 0 10px; font-size:calc(21px*var(--fs)); line-height:1.4; color:var(--ink); line-break:strict; overflow-wrap:anywhere;}
+  #guideOv .guide-p{margin:0; font-size:calc(16px*var(--fs)); line-height:1.8; color:var(--ink); white-space:pre-line; line-break:strict; overflow-wrap:anywhere;}
+  html[lang="ko"] #guideOv .guide-h, html[lang="ko"] #guideOv .guide-p{word-break:keep-all;}   /* 韓国語は空白で折る。日本語・中国語は ふつうの折り方(「。」を行の頭にしない) */
+  #guideOv .guide-lang{margin-top:14px;}
+  #guideOv .guide-lang .lbl2{margin:0 0 6px; font-size:calc(14px*var(--fs));}
+  #guideOv .guide-langs{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px;}
+  #guideOv .guide-langs .langbtn{margin:0; padding:9px 10px; min-width:0; justify-content:center; overflow-wrap:anywhere;}
+  #guideOv .guide-dots{display:flex; justify-content:center; flex-wrap:wrap; gap:7px; margin:20px 0 0;}
+  #guideOv .guide-dot{width:9px; height:9px; border-radius:50%; background:var(--line);}
+  #guideOv .guide-dot.on{background:var(--accent);}
+  #guideOv .guide-row{flex:0 0 auto; display:flex; gap:10px; background:var(--card); border-top:1px solid var(--line);
+    padding:10px 14px calc(12px + env(safe-area-inset-bottom, 0px));}
+  #guideOv .guide-row .btn{flex:1 1 0; min-width:0; margin:0; min-height:52px; overflow-wrap:anywhere;}
 </style>
 </head>
 <body>
@@ -437,6 +459,7 @@
         <div class="seg" data-set="moveSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
       <div class="setrow"><div class="sl" data-i18n="setRoulSpd">ルーレットの速さ</div>
         <div class="seg" data-set="roulSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
+      <button class="btn sub" id="guideBtn" data-i18n="guideAgain">あそびかたをもう一度見る</button>
       <button class="btn" id="suspendBtn" style="display:none;background:var(--blue);box-shadow:0 4px 0 var(--blue-d)" data-i18n="suspendBtn">中断してタイトルへ</button>
       <button class="btn sub" id="setClose" data-i18n="close">とじる</button>
       <div class="tiny" style="text-align:center;margin-top:10px">スゴロクタワー / Spinner Tower <span id="appVer"></span><br>
@@ -475,7 +498,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.4';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -2309,6 +2332,7 @@ function nameUnsaved(){
 }
 const BACK_CLOSE='#langClose,#setClose,#saveClose,#cp-close,#ci-close,#sc,#tt';   // 各窓の「とじる／出発する／タイトルへ」
 function onBack(){
+  if(guideOv && !document.querySelector('.ask-ov')){ guideOv._back(); return; }   // ⓪ はじめての あそびかた
   const ov=topOverlay();
   if(ov){
     if(ov.classList.contains('ask-ov')){ const no=ov.querySelector('.ask-no'); if(no) no.click(); return; }
@@ -2346,6 +2370,81 @@ function watchBack(){
   try{ const r=ap.addListener('backButton',()=>{ onBack(); }); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
 }
 
+// ============ はじめての あそびかた（初回の案内・2026-09-30） ============
+// ヒロさん「ひとつずつ・そよぎ みたいなタイプのアプリは、必ず最初に使い方の丁寧な説明を出してほしい。10代の情報室のように」。
+// ・初回起動で必ず出す（最後まで読むまで、開くたびに出る）。文言は i18n（guideTitle / guideStep / guidePrev / guideNext / guideStart / guideAgain / gH1〜 / gB1〜）
+// ・1ページずつ「つぎ」「まえ」で進む。閉じるのは最後のページの「あそぶ」だけ（× は置かない）
+// ・1ページ目に ことば（「Language」と同じ12言語）。案内がタイトルの「Language」もおおうので、ここでも えらべるように
+// ・戻るボタン（Play版）: 2ページ目から=まえのページ / 1ページ目=初回なら後ろに下げる（閉じない）、せっていから開いたときは閉じる
+// ・読み終えたら localStorage 'gt_guide_v1'。せっていの「あそびかたをもう一度見る」で もう一度（せっていの窓は下に残る）
+// ・このアプリのボタンは click で動く（あとから来るクリックは起きない）。音は今までどおり「最初にどこかを触ったとき」に鳴りはじめる
+const GUIDE_KEY='gt_guide_v1';
+function guideDone(){ try{ return !!localStorage.getItem(GUIDE_KEY); }catch(e){ return false; } }
+function guidePages(){ let n=0; while(n<12 && T('gB'+(n+1))!=='gB'+(n+1)) n++; return n; }
+let guideOv=null;
+function openGuide(first){
+  if(guideOv) return;                                   // もう開いていれば開かない（二重に出さない）
+  const N=guidePages(); if(!N) return;
+  let i=0;
+  const mk=(tag,cls)=>{ const e=document.createElement(tag); if(cls) e.className=cls; return e; };
+  const ov=mk('div'); ov.id='guideOv';
+  ov.setAttribute('role','dialog'); ov.setAttribute('aria-modal','true');
+  const scroll=mk('div','guide-scroll'), top=mk('div','guide-top'), ttl=mk('p','guide-title'), step=mk('p','guide-step');
+  step.setAttribute('dir','ltr');                       // 「2 / 8」は右から左の言葉(ar)でも左から
+  top.appendChild(ttl); top.appendChild(step);
+  const h=mk('h2','guide-h'), p=mk('p','guide-p');
+  const langWrap=mk('div','guide-lang'), langLbl=mk('div','lbl2'), langs=mk('div','guide-langs');
+  langWrap.appendChild(langLbl); langWrap.appendChild(langs);
+  const dots=mk('div','guide-dots'); dots.setAttribute('aria-hidden','true');
+  scroll.appendChild(top); scroll.appendChild(h); scroll.appendChild(p); scroll.appendChild(langWrap); scroll.appendChild(dots);
+  const row=mk('div','guide-row');
+  const prevB=mk('button','btn sub guide-btn guide-prev'), nextB=mk('button','btn guide-btn guide-next');
+  prevB.type='button'; nextB.type='button';
+  row.appendChild(prevB); row.appendChild(nextB);
+  ov.appendChild(scroll); ov.appendChild(row);
+  function drawLangs(){                                  // タイトルの「Language」と同じ12言語
+    langs.innerHTML=I18N_SAFE.order.map(lg=>`<button type="button" class="langbtn${lg===LANG?' on':''}" data-lg="${lg}">${I18N_SAFE.names[lg]||lg}</button>`).join('');
+    langs.querySelectorAll('.langbtn').forEach(b=>b.onclick=()=>{
+      LANG=b.dataset.lg; applyLang(); showTitleTexts();
+      if($('#langPanel').style.display!=='none') renderLangList();
+      if(G.running&&G.board){ renderHand(); updateTowerLabel(true); }   // ゲーム中に ⚙️ から開いたとき: 手札とHUDの塔の名前も その言葉に
+      AU('sfx','button'); draw();
+    });
+  }
+  function draw(){
+    const n=guidePages(); if(i>n-1) i=n-1;
+    ov.setAttribute('aria-label',T('guideTitle'));
+    ttl.textContent=T('guideTitle');
+    step.textContent=T('guideStep',{n:i+1,m:n});
+    h.textContent=T('gH'+(i+1));
+    p.textContent=T('gB'+(i+1));
+    langWrap.style.display=(i===0)?'':'none';
+    if(i===0){ langLbl.textContent=T('langTitle'); drawLangs(); }
+    dots.innerHTML='';
+    for(let k=0;k<n;k++) dots.appendChild(mk('span','guide-dot'+(k===i?' on':'')));
+    prevB.textContent=T('guidePrev');
+    prevB.style.visibility=(i===0)?'hidden':'visible';  // 「つぎ」の位置を変えない
+    nextB.textContent=(i===n-1)?T('guideStart'):T('guideNext');
+    scroll.scrollTop=0;
+  }
+  function close(){
+    try{ localStorage.setItem(GUIDE_KEY,'1'); }catch(e){}
+    ov.remove(); guideOv=null;
+  }
+  ov._draw=draw;
+  ov._back=()=>{
+    if(i>0){ i--; draw(); return; }
+    if(first) minimizeApp(); else close();               // 初回は閉じずに後ろに下げる（10代の情報室と同じ）
+  };
+  prevB.onclick=()=>{ if(i>0){ i--; AU('sfx','button'); draw(); } };
+  nextB.onclick=()=>{ AU('sfx','button'); if(i<guidePages()-1){ i++; draw(); } else close(); };
+  draw();
+  $('#app').appendChild(ov);
+  guideOv=ov;
+  try{ nextB.focus(); }catch(e){}
+}
+$('#guideBtn').onclick=()=>{ AU('sfx','button'); openGuide(false); };   // せっていの「あそびかたをもう一度見る」（せっていの窓は下に残る）
+
 window.addEventListener('resize',()=>{ if(G.board) render(); });
 $('#appVer').textContent='v'+APP_VER;
 applyLang();
@@ -2354,6 +2453,7 @@ showTitle();
 // Farcaster Mini App: 準備完了を通知（web版のみ・失敗しても通常のWebページとして動く）
 import('https://esm.sh/@farcaster/miniapp-sdk').then(m=>{ m.sdk && m.sdk.actions && m.sdk.actions.ready(); }).catch(()=>{});
 watchBack();   // Android の戻るボタン（Play版だけ）
+if(!guideDone()) openGuide(true);   // はじめての あそびかた（読み終えるまで毎回・2026-09-30）
 </script>
 </body>
 </html>
