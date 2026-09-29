@@ -343,6 +343,11 @@
     box-shadow:0 6px 20px rgba(15,28,23,.3);}
   #enemyShow .ename{font-size:calc(16px*var(--fs)); font-weight:900; color:var(--ink); margin-top:6px;}
   #enemyShow .ehp{font-size:calc(12px*var(--fs)); font-weight:800; color:var(--battle);}
+  /* アプリの中の確かめの窓（Play版の戻るボタン・2026-09-30）。カードの説明(28)・クリア演出(30)より手前 */
+  .overlay.ask-ov{z-index:32;}
+  .ask-ov .ask-msg{color:var(--ink); font-weight:800; font-size:calc(16px*var(--fs)); line-height:1.5; margin:0 0 6px;}
+  .ask-row{display:flex; gap:8px;}
+  .ask-row .btn{flex:1;}
 </style>
 </head>
 <body>
@@ -470,7 +475,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.2';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.3';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -962,7 +967,8 @@ function msg(t){ $('#msg').textContent=t; }
 function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.background=c; }
 
 // ============ 入力待ち ============
-function waitFor(type,extra={}){ return new Promise(res=>{ G.wait={type,resolve:res,...extra}; onWaitChange(); }); }
+function waitFor(type,extra={}){ return new Promise(res=>{ G.wait={type,resolve:res,...extra}; onWaitChange();
+  if(suspendDue()) suspendNow(); }); }   // 戻る→「はい」を動いている最中に選んだときは、この入力待ちで中断する（suspendSafely）
 function resolveWait(v){ const w=G.wait; G.wait=null; onWaitChange(); if(w) w.resolve(v); }
 function onWaitChange(){ const w=G.wait; $('#spinBtn').disabled=!(w&&w.type==='spin');
   // 分岐えらびの最中はAIコマのタップを止める(マスのタップを吸わせない)
@@ -1828,7 +1834,9 @@ async function decideOrder(){
     $('#app').appendChild(ov); ov.querySelector('#ordok').onclick=()=>{ ov.remove(); AU('sfx','button'); res(); }; });
 }
 async function gameLoop(){ G.running=true;
-  while(G.running){ const p=currentPlayer(); if(!p.finished){ await takeTurn(p); if(!G.running) break; } advanceTurn(); await sleep(100); } }
+  while(G.running){ const p=currentPlayer(); if(!p.finished){ await takeTurn(p); if(!G.running) break; } advanceTurn();
+    if(suspendDue()){ suspendNow(); if(!G.running) break; }   // 番の切れ目で中断（suspendSafely）。次の人の番の始めから つづきから できる
+    await sleep(100); } }
 
 // ============ 中断とつづき（2026-07-30ヒロ依頼・後半が長いのでセーブが要る） ============
 // 🔴仕様: 中断データは3つまで。**再開したらその枠は消す**（同じ場面を何度もやり直せないようにするため）。
@@ -2244,6 +2252,100 @@ $('#startBtn').onclick=()=>{
   $('#modeConfig').style.display='none'; $('#titleScreen').style.display='none';
   startGame();
 };
+// ============ Android の戻るボタン（Play版だけ・2026-09-30） ============
+// @capacitor/app が無いと、戻るを押すとアプリごと後ろに下がっていた（Android 11 以前は閉じる）。
+// 押したときの順: ①いちばん上の窓を、その窓の「とじる／タイトルへもどる／出発する」と同じ動きで閉じる
+//                  （確かめの窓＝いいえ。モード設定で名前を入れて保存していない時は、先に確かめる。
+//                    じゅんばん決めの「はじめる」だけの窓は閉じずに④と同じ）
+//                ②ゲーム中は「中断してタイトルへもどりますか？」（はい＝せっていの「中断してタイトルへ」と同じ＝保存してタイトルへ。
+//                  AIの番や移動の最中なら、次の入力待ちか番の切れ目で中断する＝下の suspendSafely）
+//                  じゅんばん決め・クリア演出の間（タイトルへもどる道が無い）は④と同じ
+//                ④タイトルなら、アプリを後ろに下げる（minimizeApp。中身はそのまま）
+// 🔴プラグインはネイティブが入れる Capacitor.Plugins.App を使う（registerPlugin は WebView に無い）
+// 🔴Play版の window.confirm はボタンが英語の OK / Cancel に決め打ちなので、確かめはアプリの中の窓(askBox)で出す
+// Web版（ブラウザ）は何もしない（戻るはブラウザのまま）
+function isNativeApp(){
+  try{ const c=window.Capacitor; return !!(c && typeof c.isNativePlatform==='function' && c.isNativePlatform()); }catch(e){ return false; }
+}
+function nativeApp(fn){
+  try{ const c=window.Capacitor;
+    if(typeof c.isPluginAvailable==='function' && !c.isPluginAvailable('App')) return null;
+    const p=c.Plugins && c.Plugins.App; return (p && typeof p[fn]==='function') ? p : null;
+  }catch(e){ return null; }
+}
+function minimizeApp(){
+  const ap=nativeApp('minimizeApp');
+  try{ if(ap){ const p=ap.minimizeApp(); if(p&&p.catch) p.catch(()=>{}); } }catch(e){}
+}
+// 確かめの窓（いいえ／はい）。done(true=はい / false=いいえ)。Web版は window.confirm（ブラウザの言葉で出る）
+function askBox(msg, done){
+  if(!isNativeApp()){ let r=false; try{ if(typeof window.confirm==='function') r=!!window.confirm(msg); }catch(e){ r=false; } done(r); return; }
+  const ov=document.createElement('div'); ov.className='overlay ask-ov';
+  ov.setAttribute('role','alertdialog'); ov.setAttribute('aria-modal','true');
+  ov.innerHTML=`<div class="sheet"><p class="ask-msg"></p><div class="ask-row"><button class="btn sub ask-no" data-back="1"></button><button class="btn ask-yes"></button></div></div>`;
+  ov.querySelector('.ask-msg').textContent=msg;
+  const no=ov.querySelector('.ask-no'), yes=ov.querySelector('.ask-yes');
+  no.textContent=T('no'); yes.textContent=T('yes');
+  let closed=false;
+  const close=v=>{ if(closed) return; closed=true; ov.remove(); AU('sfx','button'); done(v); };
+  no.onclick=()=>close(false); yes.onclick=()=>close(true);
+  $('#app').appendChild(ov);
+  try{ no.focus(); }catch(e){}
+}
+// いちばん上に見えている窓（z-indexが同じなら、あとから出た方が上）
+function topOverlay(){
+  let top=null, topZ=-1;
+  document.querySelectorAll('#app .overlay').forEach(o=>{
+    if(o.style.display==='none' || !o.getClientRects().length) return;
+    const z=+getComputedStyle(o).zIndex||0;
+    if(z>=topZ){ top=o; topZ=z; }
+  });
+  return top;
+}
+// 名前を入れて、まだ保存していない（名前は「はじめる」で保存される）
+function nameUnsaved(){
+  if($('#modeConfig').style.display==='none' || $('#nameRow').style.display==='none') return false;
+  return ($('#myName').value||'').trim() !== (localStorage.getItem('gt_name')||'').trim();
+}
+const BACK_CLOSE='#langClose,#setClose,#saveClose,#cp-close,#ci-close,#sc,#tt';   // 各窓の「とじる／出発する／タイトルへ」
+function onBack(){
+  const ov=topOverlay();
+  if(ov){
+    if(ov.classList.contains('ask-ov')){ const no=ov.querySelector('.ask-no'); if(no) no.click(); return; }
+    if(ov.id==='modeConfig'){
+      if(nameUnsaved()) askBox(T('nameUnsaved'), ok=>{ if(ok) $('#mcBack').click(); });
+      else $('#mcBack').click();
+      return;
+    }
+    const c=ov.querySelector(BACK_CLOSE);
+    if(c){ c.click(); return; }
+    minimizeApp(); return;   // じゅんばん決めの窓（「はじめる」しか無い）は閉じない
+  }
+  if($('#titleScreen').style.display!=='none'){ minimizeApp(); return; }
+  if(G.running){ askBox(T('suspendAsk'), ok=>{ if(ok) suspendSafely(); else G.suspendAt=null; }); return; }
+  minimizeApp();
+}
+// 🔴戻る→「はい」の中断は、ゲームが止まっている所でだけする（2026-09-30）。
+//   AIの番・コマの移動・演出の最中にすぐ中断すると、その番の続きが裏で動き続けて、
+//   タイトルの上にショップや結果の窓が出たり、すぐ次のゲームを始めると進行が2重に回った（試しで確認）。
+//   入力待ち（ルーレット・分岐）ならすぐ中断。動いている最中なら「次の入力待ち」か「番の切れ目」で中断する
+//   （waitFor と gameLoop が suspendDue を見る）。中断はせっていの「中断してタイトルへ」と同じ suspendGame
+function suspendSafely(){
+  if(!G.running || !G.board) return;
+  if(G.wait){ suspendNow(); return; }
+  G.suspendAt=G.board;   // このゲームだけの印（次のゲーム・つづきからには効かない）
+}
+function suspendDue(){
+  if(!G.running || !G.board || G.suspendAt!==G.board) return false;
+  G.suspendAt=null; return true;
+}
+function suspendNow(){ suspendGame(); if(!G.running) hideEnemy(); }   // バトルの入力待ちで中断したとき、敵の絵を次のゲームに残さない
+function watchBack(){
+  if(!isNativeApp()) return;
+  const ap=nativeApp('addListener'); if(!ap) return;
+  try{ const r=ap.addListener('backButton',()=>{ onBack(); }); if(r&&r.catch) r.catch(()=>{}); }catch(e){}
+}
+
 window.addEventListener('resize',()=>{ if(G.board) render(); });
 $('#appVer').textContent='v'+APP_VER;
 applyLang();
@@ -2251,6 +2353,7 @@ applySettings();
 showTitle();
 // Farcaster Mini App: 準備完了を通知（web版のみ・失敗しても通常のWebページとして動く）
 import('https://esm.sh/@farcaster/miniapp-sdk').then(m=>{ m.sdk && m.sdk.actions && m.sdk.actions.ready(); }).catch(()=>{});
+watchBack();   // Android の戻るボタン（Play版だけ）
 </script>
 </body>
 </html>
