@@ -33,7 +33,7 @@
   body{font-family:system-ui,-apple-system,"Segoe UI","Hiragino Sans","Noto Sans JP",sans-serif;
     color:var(--ink); background:#0f1c17; overscroll-behavior:none; display:flex; justify-content:center;}
   /* 🔴画面の上下は縁ぴったりにしない（端が見えにくい・押しにくい機種があるため5〜10pxの余白） */
-  #app{width:100%; max-width:480px; height:100dvh; height:100vh; background:var(--paper);
+  #app{width:100%; max-width:480px; height:100vh; height:100dvh; background:var(--paper);
     position:relative; overflow:hidden; display:flex; flex-direction:column;
     padding-top:max(8px, env(safe-area-inset-top));
     padding-bottom:max(8px, env(safe-area-inset-bottom));}
@@ -498,7 +498,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.5';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.6';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -507,9 +507,16 @@ const FLOOR_H=96, NODE=46, PAD_B=16, GROUND=116, HAND_KINDS=12, SAME_MAX=5, SOLO
 const PLAYER_COLORS=['var(--p0)','var(--p1)','var(--p2)','var(--p3)'];
 const TILE_ICON={coin:'🪙', diamond:'💎', shop:'🛒', battle:'⚔️', event:'❓', warp:'🌀', cleared:'✓', start:'🏳️'};
 
+// ============ 保存データの安全な読み書き ============
+// 🔴localStorage は使えない環境・壊れた値がありうる。ここ以外から localStorage を直接触らない。
+//   読めなければ既定値・JSONが壊れていれば既定値・書けなければ黙って続ける（遊ぶのは止めない）
+function lsGet(k,def){ try{ const v=localStorage.getItem(k); return v==null?def:v; }catch(e){ return def; } }
+function lsSet(k,v){ try{ localStorage.setItem(k,v); return true; }catch(e){ return false; } }
+function lsJSON(k,def){ try{ const v=localStorage.getItem(k); if(v==null) return def; const o=JSON.parse(v); return o==null?def:o; }catch(e){ return def; } }
+
 // ============ 多言語(12言語・辞書はi18n.js) ============
 const I18N_SAFE = window.I18N || {order:['ja'],names:{ja:'日本語'},rtl:[],dict:{ja:{}}};
-let LANG=(()=>{ const saved=localStorage.getItem('gt_lang'); if(saved&&I18N_SAFE.dict[saved]) return saved;
+let LANG=(()=>{ const saved=lsGet('gt_lang',''); if(saved&&Object.prototype.hasOwnProperty.call(I18N_SAFE.dict,saved)) return saved;
   const nav=((navigator.language||'en').slice(0,2)).toLowerCase(); return I18N_SAFE.dict[nav]?nav:'en'; })();
 if(!I18N_SAFE.dict[LANG]) LANG='ja';
 function T(k,p){ const d=I18N_SAFE.dict; let s=(d[LANG]&&d[LANG][k])!=null?d[LANG][k]:(d.ja&&d.ja[k])!=null?d.ja[k]:k;
@@ -518,7 +525,7 @@ function applyLang(){
   document.documentElement.lang=LANG;
   document.documentElement.dir=I18N_SAFE.rtl.includes(LANG)?'rtl':'ltr';
   document.querySelectorAll('[data-i18n]').forEach(el=>{ el.textContent=T(el.dataset.i18n); });
-  localStorage.setItem('gt_lang',LANG);
+  lsSet('gt_lang',LANG);
   if(G&&G.board) render();
 }
 const cardName=k=>T('cn_'+k), cardDesc=k=>T('cd_'+k);
@@ -1866,12 +1873,11 @@ async function gameLoop(){ G.running=true;
 //   保存するのは盤面と全員の状態だけ。関数やDOMは入れない（G.waitは入れない）。
 const SAVE_KEY='gt_saves', SAVE_MAX=5;   // 🔴5枠に拡張(2026-08-01ヒロ指定・対戦とソロを並行して持てるように)
 function loadSaves(){
-  try{ const a=JSON.parse(localStorage.getItem(SAVE_KEY)||'[]'); return Array.isArray(a)?a.slice(0,SAVE_MAX):[]; }
-  catch(e){ return []; }
+  const a=lsJSON(SAVE_KEY,[]); return Array.isArray(a)?a.slice(0,SAVE_MAX):[];
 }
 function writeSaves(a){
-  try{ localStorage.setItem(SAVE_KEY, JSON.stringify(a.slice(0,SAVE_MAX))); return true; }
-  catch(e){ return false; }   // 容量オーバー等は呼び出し側で知らせる
+  try{ return lsSet(SAVE_KEY, JSON.stringify(a.slice(0,SAVE_MAX))); }   // 容量オーバー等は false を返して呼び出し側で知らせる
+  catch(e){ return false; }
 }
 function hasSaves(){ return loadSaves().length>0; }
 // いまの局面を素のデータに落とす
@@ -2020,8 +2026,8 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
   if(G.mode==='solo'){
     const tiles=Math.max(0,p.path.length-1);
     extra=`<br>${T('soloResult',{f:floor,t:tiles})}`;
-    const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
-    if(!best || floor>best.floor) localStorage.setItem('gt_solo_best', JSON.stringify({floor,tiles}));
+    const best=soloBest();
+    if(!best || floor>best.floor) lsSet('gt_solo_best', JSON.stringify({floor,tiles}));
   }
   // キャンペーン：人間が勝ったらこの段をクリア扱い→次を解放。最終段はド派手コングラ
   // 🔴kind='lose'＝AIが3人先にゴールして3位に入れなかった（2026-07-31・3位以内クリア制）
@@ -2062,11 +2068,12 @@ const STAGES=[
   {floors:130, ai:7, brain:'normal'},
   {floors:130, ai:7, brain:'high'},
 ];
-function unlockedUpTo(){ return +(localStorage.getItem('gt_stage_unlocked')||0); }   // このindexまで挑戦可
-function clearedSet(){ return new Set(JSON.parse(localStorage.getItem('gt_stage_cleared')||'[]')); }
+function unlockedUpTo(){ const n=+lsGet('gt_stage_unlocked',0); return Number.isFinite(n)&&n>0?n:0; }   // このindexまで挑戦可
+function clearedSet(){ const a=lsJSON('gt_stage_cleared',[]); return new Set(Array.isArray(a)?a.filter(Number.isInteger):[]); }
+function soloBest(){ const b=lsJSON('gt_solo_best',null); return b&&Number.isFinite(b.floor)&&Number.isFinite(b.tiles)?b:null; }   // ソロの自己ベスト（壊れていたら無し）
 function markCleared(i){
-  const c=clearedSet(); c.add(i); localStorage.setItem('gt_stage_cleared', JSON.stringify([...c]));
-  if(i+1>unlockedUpTo() && i+1<STAGES.length) localStorage.setItem('gt_stage_unlocked', String(i+1));
+  const c=clearedSet(); c.add(i); lsSet('gt_stage_cleared', JSON.stringify([...c]));
+  if(i+1>unlockedUpTo() && i+1<STAGES.length) lsSet('gt_stage_unlocked', String(i+1));
 }
 function renderStageList(){
   const list=$('#stageList'); const un=unlockedUpTo(), cl=clearedSet();
@@ -2087,7 +2094,7 @@ function renderStageList(){
   mark(G.stage);   // 既定の選択を必ず見せる（未選択に見えないように）
 }
 // 自分の名前は保存して次回も使う（母国語でOK）。空なら「あなた」
-function myName(){ return (localStorage.getItem('gt_name')||'').trim() || T('you'); }
+function myName(){ return lsGet('gt_name','').trim() || T('you'); }
 // 対戦相手の名前はアルファベット2文字（かぶらないように）
 function aiNames(n){ const used=new Set(), out=[];
   while(out.length<n){ const s=String.fromCharCode(65+rand(0,25))+String.fromCharCode(65+rand(0,25));
@@ -2127,7 +2134,9 @@ function startGame(){
 }
 // ============ せってい（保存・適用） ============
 const SET_DEF={fs:1,bgm:1,sfx:1,theme:'green',moveSpd:1,roulSpd:1};
-G.set=Object.assign({},SET_DEF, JSON.parse(localStorage.getItem('gt_settings')||'{}'));
+G.set=Object.assign({},SET_DEF);
+{ const sv=lsJSON('gt_settings',null);   // 壊れた値・型違いは既定値のまま
+  if(sv&&typeof sv==='object'&&!Array.isArray(sv)) for(const k in SET_DEF){ if(typeof sv[k]===typeof SET_DEF[k]) G.set[k]=sv[k]; } }
 function AU(m,...a){ try{ if(window.GTAudio&&GTAudio[m]) GTAudio[m](...a); }catch(e){} }
 function applySettings(){
   const s=G.set;
@@ -2139,7 +2148,7 @@ function applySettings(){
     const key=seg.dataset.set;
     seg.querySelectorAll('button').forEach(b=>b.classList.toggle('on', String(s[key])===b.dataset.v));
   });
-  localStorage.setItem('gt_settings', JSON.stringify(s));
+  lsSet('gt_settings', JSON.stringify(s));
 }
 document.querySelectorAll('#setPanel .seg').forEach(seg=>{
   seg.querySelectorAll('button').forEach(b=>b.onclick=()=>{
@@ -2171,7 +2180,7 @@ function renderLangList(){
   });
 }
 function showTitleTexts(){  // タイトル画面の動的テキストを現在言語で更新
-  const best=JSON.parse(localStorage.getItem('gt_solo_best')||'null');
+  const best=soloBest();
   $('#soloBest').textContent = best? T('soloBest',{f:best.floor,t:best.tiles,ti:titleFor(best.floor)}) : '';
   const rb=$('#resumeBtn'); if(rb) rb.style.display = hasSaves()? 'flex' : 'none';   // 中断データがある時だけ出す
 }
@@ -2227,7 +2236,7 @@ document.querySelectorAll('.modebtn[data-mode]').forEach(b=>b.onclick=()=>{
   if(G.mode==='friends') renderFriendRows();
   // 自分の名前：みんなで以外で入力（前回の名前が入った状態で出る＝押すだけ）
   $('#nameRow').style.display = G.mode==='friends'?'none':'block';
-  $('#myName').value = (localStorage.getItem('gt_name')||'');
+  $('#myName').value = lsGet('gt_name','');
   $('#myName').placeholder = T('namePh');
   $('#modeConfig').style.display='flex';
 });
@@ -2238,7 +2247,7 @@ function renderFriendRows(){
   const f=G.friends; const rows=$('#friendRows');
   while(f.names.length<f.count){ f.names.push(''); f.icons.push(null); }
   // 1人目はこの端末の持ち主とみなして、記憶している名前を最初から入れておく
-  if(!f.names[0]) f.names[0]=(localStorage.getItem('gt_name')||'').trim();
+  if(!f.names[0]) f.names[0]=lsGet('gt_name','').trim();
   rows.innerHTML=Array.from({length:f.count},(_,i)=>`
     <div class="frow">
       <div class="fava" data-i="${i}" style="${f.icons[i]?`background-image:url(${f.icons[i]})`:''}">${f.icons[i]?'':(f.names[i]||(i+1)+'P').slice(0,2)}</div>
@@ -2273,8 +2282,8 @@ $('#pcountSeg').querySelectorAll('button').forEach(b=>b.onclick=()=>{ $('#pcount
 $('#startBtn').onclick=()=>{
   audioBoot(); AU('sfx','button');
   // 名前を記憶（次にやる時は入った状態で出る）
-  if(G.mode!=='friends'){ localStorage.setItem('gt_name', ($('#myName').value||'').trim()); }
-  else { const v=(G.friends.names[0]||'').trim(); if(v) localStorage.setItem('gt_name', v); }   // みんなでは1人目＝端末の持ち主
+  if(G.mode!=='friends'){ lsSet('gt_name', ($('#myName').value||'').trim()); }
+  else { const v=(G.friends.names[0]||'').trim(); if(v) lsSet('gt_name', v); }   // みんなでは1人目＝端末の持ち主
   $('#modeConfig').style.display='none'; $('#titleScreen').style.display='none';
   startGame();
 };
@@ -2331,7 +2340,7 @@ function topOverlay(){
 // 名前を入れて、まだ保存していない（名前は「はじめる」で保存される）
 function nameUnsaved(){
   if($('#modeConfig').style.display==='none' || $('#nameRow').style.display==='none') return false;
-  return ($('#myName').value||'').trim() !== (localStorage.getItem('gt_name')||'').trim();
+  return ($('#myName').value||'').trim() !== lsGet('gt_name','').trim();
 }
 const BACK_CLOSE='#langClose,#setClose,#saveClose,#cp-close,#ci-close,#sc,#tt';   // 各窓の「とじる／出発する／タイトルへ」
 function onBack(){
@@ -2382,7 +2391,7 @@ function watchBack(){
 // ・読み終えたら localStorage 'gt_guide_v1'。せっていの「あそびかたをもう一度見る」で もう一度（せっていの窓は下に残る）
 // ・このアプリのボタンは click で動く（あとから来るクリックは起きない）。音は今までどおり「最初にどこかを触ったとき」に鳴りはじめる
 const GUIDE_KEY='gt_guide_v1';
-function guideDone(){ try{ return !!localStorage.getItem(GUIDE_KEY); }catch(e){ return false; } }
+function guideDone(){ return !!lsGet(GUIDE_KEY,''); }
 function guidePages(){ let n=0; while(n<12 && T('gB'+(n+1))!=='gB'+(n+1)) n++; return n; }
 let guideOv=null;
 function openGuide(first){
@@ -2431,7 +2440,7 @@ function openGuide(first){
     scroll.scrollTop=0;
   }
   function close(){
-    try{ localStorage.setItem(GUIDE_KEY,'1'); }catch(e){}
+    lsSet(GUIDE_KEY,'1');
     ov.remove(); guideOv=null;
   }
   ov._draw=draw;
