@@ -382,11 +382,11 @@
     <span class="pill">🏢 <b id="floor">0</b></span>
     <button class="iconbtn" id="gearBtn2" style="width:36px;height:36px;font-size:16px" aria-label="せってい">⚙️</button>
   </div>
-  <div id="turnbar" data-i18n="welcome">タワーへようこそ</div>
+  <div id="turnbar" data-i18n="welcome" aria-live="polite">タワーへようこそ</div>
   <div id="stamwrap"><div class="lbl"><span data-i18n="staminaLbl">たいりょく（食料をとらないとリタイア）</span><b id="boostNum" style="display:none"></b><b id="hpnum">100</b></div><div id="stambar"><div id="stamfill"></div><div id="stamover"></div></div></div>
   <div id="boardScroll"><div id="board"><svg id="tower"></svg><svg id="links"></svg></div></div>
   <div id="ctrl">
-    <div id="msg"></div>
+    <div id="msg" aria-live="polite"></div>
     <div id="roulettewrap"><div id="roulette">?</div><button id="spinBtn" disabled data-i18n="spinBtn">ルーレット</button></div>
     <div id="hand"></div>
   </div>
@@ -498,7 +498,7 @@ const pick=a=>a[rand(0,a.length-1)];
 const sleep=ms=>new Promise(r=>setTimeout(r,ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.6';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.7.7';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -521,6 +521,8 @@ let LANG=(()=>{ const saved=lsGet('gt_lang',''); if(saved&&Object.prototype.hasO
 if(!I18N_SAFE.dict[LANG]) LANG='ja';
 function T(k,p){ const d=I18N_SAFE.dict; let s=(d[LANG]&&d[LANG][k])!=null?d[LANG][k]:(d.ja&&d.ja[k])!=null?d.ja[k]:k;
   if(p) for(const key in p) s=s.split('{'+key+'}').join(p[key]); return s; }
+// 名前など、人が打った文字を innerHTML / 属性に入れるときは必ずこれを通す（「<」「"」で表示や入力欄が崩れないように）
+function escH(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;'); }
 function applyLang(){
   document.documentElement.lang=LANG;
   document.documentElement.dir=I18N_SAFE.rtl.includes(LANG)?'rtl':'ltr';
@@ -888,7 +890,7 @@ function render(){
     const mine=(p===spot)?' mine':'';
     // 🔴全角2文字(カタカナ等)は28pxの丸からはみ出るので、wide2で字を小さくする
     const wide=(!p.icon && [...String(p.mark)].length>=2 && /[^ -ÿ]/.test(p.mark))?' wide2':'';
-    html+=`<div class="tok${p.icon?' hasicon':''}${mine}${p.isAI?' ai':''}${wide}" data-pid="${p.id}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${p.mark}</div>`; });
+    html+=`<div class="tok${p.icon?' hasicon':''}${mine}${p.isAI?' ai':''}${wide}" data-pid="${p.id}" style="left:${nodeX(n)+off}px;bottom:${nodeBottom(n)+30}px;background-color:${p.color}${iconStyle}">${escH(p.mark)}</div>`; });
   boardEl.innerHTML=`<svg id="tower"></svg><svg id="links"></svg>`+html;
   drawTower(); drawLinks(); bindNodes(); updateHUD();
 }
@@ -969,12 +971,21 @@ function bindNodes(){ boardEl.querySelectorAll('.node').forEach(el=>el.onclick=(
   if(G.wait.candidates.includes(id)) resolveWait(id);
   else { msg(T('pickGreen')); AU('sfx','button'); }   // 押せないマスを押した時も知らせる（無反応にしない）
 });
+  boardEl.querySelectorAll('.node.pick').forEach(kbdPress);   // 分かれ道の候補マスはキーボード・スイッチでも選べる
   // 🔴AIのコマをタップ→性格「だけ」を知らせる(2026-07-31ヒロ依頼)。分岐えらび中はCSSで無効化される
   boardEl.querySelectorAll('.tok.ai').forEach(el=>el.onclick=e=>{ e.stopPropagation();
     const p=G.players.filter(x=>String(x.id)===el.dataset.pid)[0]; if(!p) return;
     const ps=personaOf(p); AU('sfx','button');
     msg(ps.icon+' '+p.name+'：'+T(pKeyOf(ps.key)));
   });
+  boardEl.querySelectorAll('.tok.ai').forEach(kbdPress);
+}
+// div / span で作った「押せる所」を、キーボード・スイッチでも押せるようにする（Enter / スペースで click と同じ動き）
+function kbdPress(el){
+  if(!el || el.__kbd) return; el.__kbd=1;
+  if(!el.hasAttribute('role')) el.setAttribute('role','button');
+  el.tabIndex=0;
+  el.addEventListener('keydown',e=>{ if(e.key==='Enter'||e.key===' '||e.key==='Spacebar'){ e.preventDefault(); el.click(); } });
 }
 function autoScroll(p){ const b=G.board,H=boardHeight(),n=b.nodes[p.node];
   scrollEl.scrollTo({top:Math.max(0,H-(nodeBottom(n)+NODE/2)-scrollEl.clientHeight*0.58),behavior:'smooth'}); }
@@ -1493,7 +1504,8 @@ function openShop(p,opt){ return new Promise(resolve=>{
             note: full? T('cantHold') : '', action:()=>doBuy(+buyBtn.dataset.b) }); }
         else if(sellBtn){ const s=sellOf(k);
           cardPopup(k,{ actionLabel:`${T('sell')}（+${s.d?'💎'+s.d*mult+' ':''}🪙${s.c*mult}）`, action:()=>doSell(+sellBtn.dataset.s) }); }
-        else cardPopup(k,{}); }; });
+        else cardPopup(k,{}); };
+      kbdPress(el); });
     ov.querySelector('#sc').onclick=()=>{ ov.remove(); resolve(); }; };
   draw(); $('#app').appendChild(ov); if(p.isAI) setTimeout(()=>{ ov.remove(); resolve(); },400);
 }); }
@@ -1755,7 +1767,7 @@ function renderHand(){
     return `<div class="cchip r${c.r} ${canUse?'usable':'dim'}" data-i="${g.i}">${cardName(g.key)}${num}</div>`; }).join('');
   if(me.security>0) h+=`<div class="cchip guard">🛡️×${me.security}</div>`;
   wrap.innerHTML=h;
-  wrap.querySelectorAll('.cchip[data-i]').forEach(el=>el.onclick=()=>cardInfo(me,+el.dataset.i)); // タップで説明→使える時は使うボタン
+  wrap.querySelectorAll('.cchip[data-i]').forEach(el=>{ el.onclick=()=>cardInfo(me,+el.dataset.i); kbdPress(el); }); // タップで説明→使える時は使うボタン(キーボードでも)
 }
 function cardInfo(p, i){
   const k=p.cards[i], c=CARDS[k]; if(!c) return;
@@ -1859,7 +1871,7 @@ async function decideOrder(){
     ov.innerHTML=`<div class="sheet"><h2>${T('orderReady')}</h2>
       ${G.players.map((p,i)=>{ const ps=p.isAI?personaOf(p):null;
         const tag=ps?` <span class="tiny" style="font-weight:700">${ps.icon}${T('p'+ps.key.charAt(0).toUpperCase()+ps.key.slice(1))}</span>`:'';
-        return `<div class="shopItem"><span class="ic" style="width:26px;height:26px;border-radius:8px;background:${p.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900">${i+1}</span><span class="nm">${p.name}${tag}</span><span class="cst">🎡 ${score.get(p)[0]}</span></div>`; }).join('')}
+        return `<div class="shopItem"><span class="ic" style="width:26px;height:26px;border-radius:8px;background:${p.color};color:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:900">${i+1}</span><span class="nm">${escH(p.name)}${tag}</span><span class="cst">🎡 ${score.get(p)[0]}</span></div>`; }).join('')}
       <button class="btn" id="ordok">${T('startBtn')}</button></div>`;
     $('#app').appendChild(ov); ov.querySelector('#ordok').onclick=()=>{ ov.remove(); AU('sfx','button'); res(); }; });
 }
@@ -2036,7 +2048,7 @@ function endGame(kind,p){ G.running=false; $('#spinBtn').disabled=true; const fl
   if(humanWin && G.mode==='campaign') markCleared(G.stage||0);
   const rankPart = G.mode==='campaign' && kind==='win' && p.rank ? `${['','🥇','🥈','🥉'][p.rank]||''} ${T('rankClear',{n:p.rank})}<br>` : '';
   const show=()=>{ const ov=document.createElement('div'); ov.className='overlay';
-    const head=kind==='win'?(grand?T('endGrandHead'):T('endWinHead',{name:p.name})):kind==='lose'?T('endLoseHead'):T('endRetireHead');
+    const head=kind==='win'?(grand?T('endGrandHead'):T('endWinHead',{name:escH(p.name)})):kind==='lose'?T('endLoseHead'):T('endRetireHead');
     const unlockNote = humanWin && G.mode==='campaign' && !grand && (G.stage||0)+1<STAGES.length ? `<br>${T('unlocked',{s:T('st'+((G.stage||0)+1))})}` : '';
     const body=rankPart+(kind==='win'?(grand?T('endGrandBody'):T('endWinBody')):kind==='lose'?T('endLoseBody'):``)+`${extra}${unlockNote}<br>${T('titleName',{t:titleFor(floor)})}`;
     ov.innerHTML=`<div class="sheet"><h1 style="font-size:20px">${head}</h1><p>${body}</p><button class="btn" id="again">${T('again')}</button><button class="btn sub" id="tt">${T('toTitle')}</button></div>`;
@@ -2250,8 +2262,8 @@ function renderFriendRows(){
   if(!f.names[0]) f.names[0]=lsGet('gt_name','').trim();
   rows.innerHTML=Array.from({length:f.count},(_,i)=>`
     <div class="frow">
-      <div class="fava" data-i="${i}" style="${f.icons[i]?`background-image:url(${f.icons[i]})`:''}">${f.icons[i]?'':(f.names[i]||(i+1)+'P').slice(0,2)}</div>
-      <input class="fnick" data-i="${i}" maxlength="12" placeholder="${T('nickPh',{n:i+1})}" value="${f.names[i]||''}">
+      <div class="fava" data-i="${i}" style="${f.icons[i]?`background-image:url(${f.icons[i]})`:''}">${f.icons[i]?'':escH((f.names[i]||(i+1)+'P').slice(0,2))}</div>
+      <input class="fnick" data-i="${i}" maxlength="12" placeholder="${T('nickPh',{n:i+1})}" value="${escH(f.names[i]||'')}">
       <button class="fcam" data-i="${i}" aria-label="写真">📷</button>
     </div>`).join('');
   rows.querySelectorAll('.fnick').forEach(inp=>inp.oninput=()=>{ f.names[+inp.dataset.i]=inp.value;   // 名前は母国語でOK（コマには先頭2文字）
@@ -2368,6 +2380,16 @@ function onBack(){
 //   （waitFor と gameLoop が suspendDue を見る）。中断はせっていの「中断してタイトルへ」と同じ suspendGame
 function suspendSafely(){
   if(!G.running || !G.board) return;
+  // 中断の枠が5つとも うまっているときは、いちばん古い中断が消えることを先に知らせて確かめる（黙って消さない）。
+  // 「いいえ」なら中断しない（ゲームはそのまま続く）
+  if(loadSaves().length>=SAVE_MAX){
+    askBox(T('saveOldestAsk'), ok=>{ if(ok) suspendSafelyGo(); else G.suspendAt=null; });
+    return;
+  }
+  suspendSafelyGo();
+}
+function suspendSafelyGo(){
+  if(!G.running || !G.board) return;
   if(G.wait){ suspendNow(); return; }
   G.suspendAt=G.board;   // このゲームだけの印（次のゲーム・つづきからには効かない）
 }
@@ -2463,7 +2485,10 @@ applyLang();
 applySettings();
 showTitle();
 // Farcaster Mini App: 準備完了を通知（web版のみ・失敗しても通常のWebページとして動く）
-import('https://esm.sh/@farcaster/miniapp-sdk').then(m=>{ m.sdk && m.sdk.actions && m.sdk.actions.ready(); }).catch(()=>{});
+// Farcaster の中(iframe / アプリの WebView)で開いたときだけ SDK を読む。ふつうのブラウザ・PWA では外へつながない
+if ((window.self !== window.top) || window.ReactNativeWebView) {
+  import('https://esm.sh/@farcaster/miniapp-sdk').then(m=>{ m.sdk && m.sdk.actions && m.sdk.actions.ready(); }).catch(()=>{});
+}
 watchBack();   // Android の戻るボタン（Play版だけ）
 if(!guideDone()) openGuide(true);   // はじめての あそびかた（読み終えるまで毎回・2026-09-30）
 </script>
