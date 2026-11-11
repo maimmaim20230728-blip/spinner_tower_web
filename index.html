@@ -44,6 +44,7 @@
   #hud .spacer{flex:1;}
   .pill{display:inline-flex; align-items:center; gap:4px; background:var(--paper);
     border:1px solid var(--line); border-radius:999px; padding:3px 9px; font-size:13px; font-weight:700;}
+  .sronly{position:absolute; width:1px; height:1px; margin:-1px; padding:0; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap; border:0;}
   #turnbar{flex:0 0 auto; padding:6px 10px; font-weight:800; font-size:14px; color:#fff; background:var(--green);
     text-align:center; transition:background .2s;}
   #stamwrap{flex:0 0 auto; padding:6px 10px; background:var(--card); border-bottom:1px solid var(--line); display:none;}
@@ -305,6 +306,10 @@
   .stagebtn.save-campaign .snum{background:var(--accent);}
   .stagebtn.save-friends .snum{background:#2f7fc4;}
   .stagebtn.save-solo .snum{background:#8b5cf6;}
+  .saveslot{margin:5px 0 10px;}
+  .saveslot .stagebtn{margin-bottom:3px;}
+  .savememo{width:100%; box-sizing:border-box; padding:7px 10px; border:1.5px solid var(--line); border-radius:10px; background:var(--paper); color:var(--ink); font-size:calc(13px*var(--fs)); font-family:inherit;}
+  .savememo:focus{outline:none; border-color:var(--accent);}
   .stagebtn.cleared{border-color:var(--accent);}
   .stagebtn.cleared .schk{color:var(--accent-d); font-size:16px;}
   .stagebtn.locked{opacity:.45;}
@@ -364,9 +369,10 @@
   #guideOv .guide-lang .lbl2{margin:0 0 6px; font-size:calc(14px*var(--fs));}
   #guideOv .guide-langs{display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:6px;}
   #guideOv .guide-langs .langbtn{margin:0; padding:9px 10px; min-width:0; justify-content:center; overflow-wrap:anywhere;}
-  #guideOv .guide-dots{display:flex; justify-content:center; flex-wrap:wrap; gap:7px; margin:20px 0 0;}
-  #guideOv .guide-dot{width:9px; height:9px; border-radius:50%; background:var(--line);}
-  #guideOv .guide-dot.on{background:var(--accent);}
+  #guideOv .guide-dots{display:flex; justify-content:center; flex-wrap:wrap; gap:0; margin:14px 0 0;}
+  #guideOv .guide-dot{position:relative; width:26px; height:26px; padding:0; margin:0; border:0; background:transparent; cursor:pointer;}   /* 見た目は9pxの点・押せる範囲は26px */
+  #guideOv .guide-dot::before{content:''; position:absolute; left:50%; top:50%; width:9px; height:9px; margin:-4.5px 0 0 -4.5px; border-radius:50%; background:var(--line);}
+  #guideOv .guide-dot.on::before{background:var(--accent);}
   #guideOv .guide-row{flex:0 0 auto; display:flex; gap:10px; background:var(--card); border-top:1px solid var(--line);
     padding:10px 14px calc(12px + env(safe-area-inset-bottom, 0px));}
   #guideOv .guide-row .btn{flex:1 1 0; min-width:0; margin:0; min-height:52px; overflow-wrap:anywhere;}
@@ -387,6 +393,7 @@
   <div id="boardScroll"><div id="board"><svg id="tower"></svg><svg id="links"></svg></div></div>
   <div id="ctrl">
     <div id="msg" aria-live="polite"></div>
+    <div id="srLive" class="sronly" role="status" aria-live="polite" aria-atomic="true"></div>
     <div id="roulettewrap"><div id="roulette">?</div><button id="spinBtn" disabled data-i18n="spinBtn">ルーレット</button></div>
     <div id="hand"></div>
   </div>
@@ -459,6 +466,8 @@
         <div class="seg" data-set="moveSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
       <div class="setrow"><div class="sl" data-i18n="setRoulSpd">ルーレットの速さ</div>
         <div class="seg" data-set="roulSpd"><button data-v="0.25">0.25</button><button data-v="0.5">0.5</button><button data-v="1" class="on" data-i18n="times1">1倍</button><button data-v="1.5">1.5</button><button data-v="2" data-i18n="times2">2倍</button></div></div>
+      <div class="setrow"><div class="sl" data-i18n="setSlow">ゆっくりモード（間をのばす）</div>
+        <div class="seg" data-set="slow"><button data-v="0" class="on" data-i18n="slowNo">ふつう</button><button data-v="1" data-i18n="slowYes">ゆっくり</button></div></div>
       <button class="btn sub" id="guideBtn" data-i18n="guideAgain">あそびかたをもう一度見る</button>
       <button class="btn" id="suspendBtn" style="display:none;background:var(--blue);box-shadow:0 4px 0 var(--blue-d)" data-i18n="suspendBtn">中断してタイトルへ</button>
       <button class="btn sub" id="setClose" data-i18n="close">とじる</button>
@@ -495,10 +504,12 @@
 const $=s=>document.querySelector(s);
 const rand=(a,b)=>a+Math.floor(Math.random()*(b-a+1));
 const pick=a=>a[rand(0,a.length-1)];
-const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+// ゆっくりモード(せってい)の間は、ゲームの間(ま)を2倍にのばす。ルーレットとマス移動の速さの設定とは別に重なる
+const SLOW_X=2;
+const sleep=ms=>new Promise(r=>setTimeout(r, (typeof G!=='undefined' && G.set && G.set.slow) ? ms*SLOW_X : ms));
 const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 
-const APP_VER='2.7.9';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
+const APP_VER='2.8.0';   // 🔴更新のたびに必ず上げる(versionCode/versionNameと連動)
 // 🔴手札は「12種類まで」。同じカードは9枚まで重ねて持てる（🔴v2.4.0からプラス系・ルーレット系は
 //   いちばん強い1枚だけが効く。重ねて増えるのはセキュリティの回数だけ。ダブりはショップで売る資金）
 // PAD_B=いちばん下のマスと画面の下端のすき間。ここに「ふもとの地面」を描く
@@ -1005,6 +1016,8 @@ function updateHUD(){ const me=viewPlayer();
     if(bs){ const b=me.boost||0; bs.textContent = b>0 ? T('boostLeft',{n:b}) : ''; bs.style.display = b>0?'inline':'none'; }
   } }
 function msg(t){ $('#msg').textContent=t; }
+// 画面が見えにくい人向け: 見えない読み上げ欄に短く流す(ルーレットの出目など)。同じ文が続いても読まれるよう一度空にする
+function announce(t){ const el=$('#srLive'); if(!el) return; el.textContent=''; setTimeout(()=>{ el.textContent=t; },30); }
 function banner(t,c){ const tb=$('#turnbar'); tb.textContent=t; if(c) tb.style.background=c; }
 
 // ============ 入力待ち ============
@@ -1038,7 +1051,7 @@ async function doSpin(p,{label='',hint=''}={}){
     AU('sfx','spin');
     for(let i=0;i<9;i++){ roul.textContent=rand(lo,hi); await sleep(rlDelay(45+i*8)); }
     base=rand(lo,hi); val=base+plusOf(p)+(ctx.plusAdd||0); }
-  roul.textContent=val; AU('sfx','tick');
+  roul.textContent=val; AU('sfx','tick'); announce(p.name+': '+val);
   if(label) msg(T('msgSpin',{name:p.name,label,val}) + (val!==base?T('dieShown',{n:base}):''));
   await sleep(rlDelay(230)); return {base,val};
 }
@@ -1941,11 +1954,17 @@ function renderSaveList(){
   el.innerHTML=list.map((s,i)=>{
     const me=s.players[s.meIdx]||s.players[0]||{};
     const hpPart=s.mode==='solo' ? '　HP'+(me.hp!=null?me.hp:'?') : '';
-    return `<button class="stagebtn save-${s.mode||'solo'}" data-i="${i}">
+    return `<div class="saveslot"><button class="stagebtn save-${s.mode||'solo'}" data-i="${i}">
     <span class="snum">${ICON[s.mode]||'📖'}</span>
     <span class="sinfo">${saveLabel(s)}${hpPart}
-      <div class="sdesc">${T('savePlayers',{n:s.players.length})}　🕒${fmtSaveTs(s.ts)}</div></span></button>`;
+      <div class="sdesc">${T('savePlayers',{n:s.players.length})}　🕒${fmtSaveTs(s.ts)}</div></span></button>
+    <input class="savememo" data-i="${i}" dir="auto" maxlength="20" placeholder="${escH(T('saveMemoPh'))}" aria-label="${escH(T('saveMemoPh'))}" value="${escH(s.memo||'')}"></div>`;
   }).join('');
+  // 一言メモ: 打つたびにその枠へ保存(読み込んだ枠はこれまでどおりそこで消える)
+  el.querySelectorAll('.savememo').forEach(inp=>inp.oninput=()=>{
+    const all=loadSaves(), s=all[+inp.dataset.i]; if(!s) return;
+    s.memo=inp.value.slice(0,20); writeSaves(all);
+  });
   el.querySelectorAll('.stagebtn').forEach(b=>b.onclick=()=>{
     AU('sfx','button');
     const idx=+b.dataset.i, all=loadSaves(), s=all[idx];
@@ -2145,7 +2164,7 @@ function startGame(){
   (async()=>{ await decideOrder(); gameLoop(); })();   // 先にルーレットでじゅんばんを決める
 }
 // ============ せってい（保存・適用） ============
-const SET_DEF={fs:1,bgm:1,sfx:1,theme:'green',moveSpd:1,roulSpd:1};
+const SET_DEF={fs:1,bgm:1,sfx:1,theme:'green',moveSpd:1,roulSpd:1,slow:0};
 G.set=Object.assign({},SET_DEF);
 { const sv=lsJSON('gt_settings',null);   // 壊れた値・型違いは既定値のまま
   if(sv&&typeof sv==='object'&&!Array.isArray(sv)) for(const k in SET_DEF){ if(typeof sv[k]===typeof SET_DEF[k]) G.set[k]=sv[k]; } }
@@ -2429,7 +2448,7 @@ function openGuide(first){
   const h=mk('h2','guide-h'), p=mk('p','guide-p');
   const langWrap=mk('div','guide-lang'), langLbl=mk('div','lbl2'), langs=mk('div','guide-langs');
   langWrap.appendChild(langLbl); langWrap.appendChild(langs);
-  const dots=mk('div','guide-dots'); dots.setAttribute('aria-hidden','true');
+  const dots=mk('div','guide-dots');
   scroll.appendChild(top); scroll.appendChild(h); scroll.appendChild(p); scroll.appendChild(langWrap); scroll.appendChild(dots);
   const row=mk('div','guide-row');
   const prevB=mk('button','btn sub guide-btn guide-prev'), nextB=mk('button','btn guide-btn guide-next');
@@ -2455,7 +2474,12 @@ function openGuide(first){
     langWrap.style.display=(i===0)?'':'none';
     if(i===0){ langLbl.textContent=T('langTitle'); drawLangs(); }
     dots.innerHTML='';
-    for(let k=0;k<n;k++) dots.appendChild(mk('span','guide-dot'+(k===i?' on':'')));
+    for(let k=0;k<n;k++){
+      const d=mk('button','guide-dot'+(k===i?' on':'')); d.type='button';
+      d.setAttribute('aria-label',T('guideStep',{n:k+1,m:n})); if(k===i) d.setAttribute('aria-current','step');
+      d.onclick=()=>{ if(k!==i){ i=k; AU('sfx','button'); draw(); try{ dots.children[k].focus(); }catch(e){} } };
+      dots.appendChild(d);
+    }
     prevB.textContent=T('guidePrev');
     prevB.style.visibility=(i===0)?'hidden':'visible';  // 「つぎ」の位置を変えない
     nextB.textContent=(i===n-1)?T('guideStart'):T('guideNext');
